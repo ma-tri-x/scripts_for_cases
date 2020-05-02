@@ -1,0 +1,233 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+  
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * 2019-02-13 Max Koch cartesian core simple   * * * * * * * * //
+// * * * * * * * * *rt *_______ edge3,4* * * * * * * * * * * * * * * * * * * //
+// * * * * * * XF* * * | * * * O--_____*__ rt* * * * * * * * * * * * * * * * //
+// * * * * * * * * *rt |____ C2* * * * / *----___* * * * * * * * * * * * * * //
+// * * * * * * X * * * | * * __0_* * */* * * * * ---___*edge1,2* * * * * * * //
+// * * * * * * * * * * | * edge7,8---/--_* * * * * * * O-\ * * * * * * * * * //
+// * * * * * * * * * * | * * * * * */rt* ---_* *C1 * * * *\* * * * * * * * * //
+// * * * * * * * * * * | * B2* * * / * * * * ---O*edge5,6* \ * * * * * * * * //
+// * * * * * * * * * * | * * * * */* * * * * * * \ * * * * *|* * * * * * * * //
+// * * * * * * * * * * |* * * * / * * * * * * * *\* * * * *|  * * * * * * * //
+// * * * * * * * * *lt |_______*/* * * * * * * * * | * * * *|* * * * * * * * //
+// * * * * * * Xi* * * | * * * | rt* *B1 * * * * * | * * * *|* * * * * * * * //
+// * * * * * * * * * * | *A1 * | * * * * * * * * * | * * * *|* * * * * * * * //
+// * * * * * * * * * * |_______|___________________|_______*|* * * * * * * * //
+// * * * * * * * * * *ld * * * rd* * * * * * * * * rd* * * *rd * * * * * * * //
+// * * * * * * * * * * * * * * Xi* * * * * * * * * X * * * *XF * * * * * * * //
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'use Math::Trig; use Math::Round; printf ($1)')])
+define(PI, 3.14159265358979323846264338327950288)
+
+//# define function to get circle point coordinates when having origin in (0 0 0)
+//# GCP = getCirclePoint
+//# GCPx = R * cos(phi [deg]) * cos(theta [rad]
+define(GCPx, [calc(($1)*cos( ($2)/180.*PI ) *cos(($3)/180.*PI))])
+define(GCPy, [calc(($1)*sin( ($2)/180.*PI ))])
+define(GCPz, [calc(($1)*cos( ($2)/180.*PI ) *sin(($3)/180.*PI))])
+
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+
+
+
+//# parameters that drive the mesh:
+define(Rmax, _BUBBLE-RMAX)
+define(Xi, _MESH-MESHCORESIZE)                   // core rim (domain A)
+define(Xir,Xi)                     // core rim points radius
+define(X, calc(_MESH-FACTORBUBBLEDOMAINRMAX * Rmax))                     // bubble domain im (domain B)
+define(XF,calc(_MESH-DOMAINSIZEFACTORRMAX * Rmax))              // mesh end (domain C)
+define(cellsize, _MESH-CELLSIZE)
+//#define(Bnum90deG, _MESH-NUMPER90DEG)      // angular number of cells in B domain
+
+
+
+//################### domain A
+define(Anum, calc(round(Xi/cellsize)))
+define(Bnum45deg, Anum)
+define(Bnum90deg, calc(2.*Anum))
+define(Cnum90deg, Bnum90deg)
+define(Cnum45deg, Bnum45deg)
+//# cell width at x=Xi
+define(cw_Xi, cellsize)
+
+//################### domain B
+//# length of B domain
+define(l_B, calc(X-Xi)) 
+//# grading of B domain
+define(Bgrd,calc(X/Xi)) 
+//# computing radial number of cells
+define(logarg, calc((cw_Xi/l_B-1.)/(cw_Xi/l_B*Bgrd - 1.)))
+define(_Bnum, calc(1+log(Bgrd)/log(logarg)  ))
+define(Bnum, calc(round(_Bnum)))
+//# cell width at x=X
+define(cw_X, calc(cw_Xi*Bgrd))
+
+//################### domain C
+//# same for domain C
+define(l_C, calc(XF-X)) 
+define(Cgrd,calc(5.25*XF/X)) 
+//# we take double the size of the cell in C domain and half the amount of cells in angular direction
+define(cw_X_C, cw_X)
+//define(Cnum90deg, Bnum90deg)
+//
+define(logargC, calc((cw_X_C/l_C-1.)/(cw_X_C/l_C*Cgrd - 1.)))
+define(_Cnum, calc(1+log(Cgrd)/log(logargC)  ))
+define(Cnum, calc(round(_Cnum)))
+define(cw_XF, calc(cw_X_C*Cgrd))
+
+define(theta, calc(90./Bnum90deg/2.))   //# half of opening angle of wedge mesh such that A and B domain have cell ratios 1
+
+
+define(rsx, calc(0.5*(Xi+Xi*cos(45./180.*PI))))
+
+//# l=left,r=right,f=front,b=back,t=top,d=down; Teildomänen durchnummeriert von unten nach oben
+//# Reihenfolge: domain-nummer-left/right-top/down-front/back
+vertices
+(
+
+    (                    0              0                     0)      vlabel(A1ldf)
+    (                    0              0                     0)      vlabel(A1ldb)
+    (GCPx(Xi ,  0., theta)             0.  GCPz(Xi , 0., theta))      vlabel(A1rdf)
+    (GCPx(Xi ,  0.,-theta)             0.  GCPz(Xi , 0.,-theta))      vlabel(A1rdb)
+    (GCPx(Xi ,  0., theta)             Xi  GCPz(Xi , 0., theta))      vlabel(A1rtf)
+    (GCPx(Xi ,  0.,-theta)             Xi  GCPz(Xi , 0.,-theta))      vlabel(A1rtb)
+    (                    0             Xi                     0)      vlabel(A1ltf)
+    (                    0             Xi                     0)      vlabel(A1ltb)
+    
+    (GCPx(X  ,  0., theta) GCPy(X  ,  0.) GCPz(X  ,  0., theta))      vlabel(B1rdf)
+    (GCPx(X  ,  0.,-theta) GCPy(X  ,  0.) GCPz(X  ,  0.,-theta))      vlabel(B1rdb)
+    (GCPx(X  , 45., theta) GCPy(X  , 45.) GCPz(X  , 45., theta))      vlabel(B1rtf)
+    (GCPx(X  , 45.,-theta) GCPy(X  , 45.) GCPz(X  , 45.,-theta))      vlabel(B1rtb)
+            
+    (GCPx(X  , 90., theta) GCPy(X  , 90.) GCPz(X  , 90., theta))      vlabel(B2rtf)
+    (GCPx(X  , 90.,-theta) GCPy(X  , 90.) GCPz(X  , 90.,-theta))      vlabel(B2rtb)
+                                          
+    (GCPx(XF ,  0., theta) GCPy(XF ,  0.) GCPz(XF ,  0., theta))      vlabel(C1rdf)
+    (GCPx(XF ,  0.,-theta) GCPy(XF ,  0.) GCPz(XF ,  0.,-theta))      vlabel(C1rdb)
+    (GCPx(XF , 45., theta) GCPy(XF , 45.) GCPz(XF , 45., theta))      vlabel(C1rtf)
+    (GCPx(XF , 45.,-theta) GCPy(XF , 45.) GCPz(XF , 45.,-theta))      vlabel(C1rtb)
+                                               
+    (GCPx(XF , 90., theta) GCPy(XF , 90.) GCPz(XF , 90., theta))      vlabel(C2rtf)
+    (GCPx(XF , 90.,-theta) GCPy(XF , 90.) GCPz(XF , 90.,-theta))      vlabel(C2rtb)
+);
+ 
+blocks
+(
+  hex (A1ldf A1rdf A1rdb A1ldb   A1ltf A1rtf A1rtb A1ltb)  (Anum 1      Anum) simpleGrading (   1 1 1) //# A1
+  //# B                                                            
+  hex (A1rdf B1rdf B1rdb A1rdb   A1rtf B1rtf B1rtb A1rtb)  (Bnum 1 Bnum45deg) simpleGrading (Bgrd 1 1) //# B1
+  hex (A1rtf B1rtf B1rtb A1rtb   A1ltf B2rtf B2rtb A1ltb)  (Bnum 1 Bnum45deg) simpleGrading (Bgrd 1 1) //# B2
+  //# C                                                               
+  hex (B1rdf C1rdf C1rdb B1rdb   B1rtf C1rtf C1rtb B1rtb)  (Cnum 1 Cnum45deg) simpleGrading (Cgrd 1 1) //# C1
+  hex (B1rtf C1rtf C1rtb B1rtb   B2rtf C2rtf C2rtb B2rtb)  (Cnum 1 Cnum45deg) simpleGrading (Cgrd 1 1) //# C2
+);
+
+
+edges                  
+(
+  arc C1rdf  C1rtf  (GCPx(XF , calc(45./2.    ), theta) GCPy(XF , calc(45./2.    )) GCPz(XF , calc(45./2.    ), theta))
+  arc C1rdb  C1rtb  (GCPx(XF , calc(45./2.    ),-theta) GCPy(XF , calc(45./2.    )) GCPz(XF , calc(45./2.    ),-theta))
+  
+  arc C2rtf  C1rtf  (GCPx(XF , calc(45./2.+45.), theta) GCPy(XF , calc(45./2.+45.)) GCPz(XF , calc(45./2.+45.), theta))
+  arc C2rtb  C1rtb  (GCPx(XF , calc(45./2.+45.),-theta) GCPy(XF , calc(45./2.+45.)) GCPz(XF , calc(45./2.+45.),-theta))
+                                                                    
+  arc B1rdf  B1rtf  (GCPx( X , calc(45./2.    ), theta) GCPy(X  , calc(45./2.    )) GCPz( X , calc(45./2.    ), theta))
+  arc B1rdb  B1rtb  (GCPx( X , calc(45./2.    ),-theta) GCPy(X  , calc(45./2.    )) GCPz( X , calc(45./2.    ),-theta))
+  
+  arc B2rtf  B1rtf  (GCPx( X , calc(45./2.+45.), theta) GCPy(X  , calc(45./2.+45.)) GCPz( X , calc(45./2.+45.), theta))
+  arc B2rtb  B1rtb  (GCPx( X , calc(45./2.+45.),-theta) GCPy(X  , calc(45./2.+45.)) GCPz( X , calc(45./2.+45.),-theta))
+);
+ 
+patches
+(
+     wedge front
+     (    
+           (A1ldf A1rdf A1rtf A1ltf) //#A1
+           
+           (A1rdf B1rdf B1rtf A1rtf) //#B1
+           (A1rtf B1rtf B2rtf A1ltf) //#B2
+           
+           (B1rdf C1rdf C1rtf B1rtf) //#C1
+           (B1rtf C1rtf C2rtf B2rtf) //#C2
+     )     
+           
+
+     wedge back
+     (
+           (A1ldb A1rdb A1rtb A1ltb) //#A1
+           
+           (A1rdb B1rdb B1rtb A1rtb) //#B1
+           (A1rtb B1rtb B2rtb A1ltb) //#B2
+           
+           (B1rdb C1rdb C1rtb B1rtb) //#C1
+           (B1rtb C1rtb C2rtb B2rtb) //#C2
+     )
+     
+     patch side
+     (            
+            (C1rdf C1rdb C1rtb C1rtf) //#C1
+            (C1rtf C1rtb C2rtb C2rtf) //#C2
+     )
+     
+     patch wall
+     (
+            (A1ldf A1ldb A1rdb A1rdf) //#A1         
+            (A1rdf A1rdb B1rdb B1rdf) //#B1
+            (B1rdf B1rdb C1rdb C1rdf) //#C1
+     )
+
+     empty axis
+     (
+           (A1ldf A1ltf A1ltb A1ldb) //#A1
+           (A1ltf B2rtf B2rtb A1ltb) //#B2
+           (B2rtf C2rtf C2rtb B2rtb) //#C2
+     )
+);   
+     
+
+mergePatchPairs
+(
+);                       
+
+//// cell width at Xi:
+//cw_Xi
+//// meaning a timestep of...
+//calc(0.4*cw_Xi/200)
+//// ... for 200 m/s at smallest cell and maxCo=0.4
+
+

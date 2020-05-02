@@ -1,0 +1,377 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+  
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * 2019-02-13 Max Koch cartesian core simple   * * * * * * * * //
+// * * * * * * * * *rt *_______ edge3,4* * * * * * * * * * * * * * * * * * * //
+// * * * * * * XF* * * | * * * O--_____*__ rt* * * * * * * * * * * * * * * * //
+// * * * * * * * * *rt |____ C2* * * * / *----___* * * * * * * * * * * * * * //
+// * * * * * * X * * * | * * __0_* * */* * * * * ---___*edge1,2* * * * * * * //
+// * * * * * * * * * * | * edge7,8---/--_* * * * * * * O-\ * * * * * * * * * //
+// * * * * * * * * * * | * * * * * */rt* ---_* *C1 * * * *\* * * * * * * * * //
+// * * * * * * * * * * | * B2*11,12/ * * * * ---O*edge5,6* \ * * * * * * * * //
+// * * * * * * * * *rt |____edge */* * * * * * * \ * * * * *|* * * * * * * * //
+// * * * * * * Xii * * |A3* O----/____ * * * * * *\* * * * *|  * * * * * * * //
+// * * * * * * * * *lt |_______*/*rt *\o edge 9,10 | * * * *|* * * * * * * * //
+// * * * * * * Xi* * * | * * * | rt* * \  B1 * * * | * * * *|* * * * * * * * //
+// * * * * * * * * * * | *A1 * | * A2* *|* * * * * | * * * *|* * * * * * * * //
+// * * * * * * * * * * |_______|________|__________|_______*|* * * * * * * * //
+// * * * * * * * * * *ld * * * rd* * * ld* * * * * rd* * * *rd * * * * * * * //
+// * * * * * * * * * * * * * * Xi* * * Xii * * * * X * * * *XF * * * * * * * //
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'use Math::Trig; use Math::Round; printf ($1)')])
+define(writeTheta, [esyscmd(echo '$1' > THETA)])
+define(PI, 3.14159265358979323846264338327950288)
+
+//# define function to get circle point coordinates when having origin in (0 0 0)
+//# GCP = getCirclePoint
+//# GCPx = R * cos(phi [deg]) * cos(theta [rad]
+define(GCPx, [calc(($1)*cos( ($2)/180.*PI ) *cos(($3)/180.*PI))])
+define(GCPy, [calc(($1)*sin( ($2)/180.*PI ))])
+define(GCPz, [calc(($1)*cos( ($2)/180.*PI ) *sin(($3)/180.*PI))])
+
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+
+
+
+//# parameters that drive the mesh:
+define(Rmax, _BUBBLE-RMAX)
+define(Xi, _MESH-MESHCORESIZE)                   // core rim (domain A)
+define(Xii,calc(1.2*sqrt(2)*Xi))                     // core rim points radius
+define(X, calc(_MESH-FACTORBUBBLEDOMAINRMAX * Rmax))                     // bubble domain im (domain B)
+define(XF,calc(_MESH-DOMAINSIZEFACTORRMAX * Rmax))              // mesh end (domain C)
+define(cellsize, _MESH-CELLSIZE)
+//#define(Bnum90deG, _MESH-NUMPER90DEG)      // angular number of cells in B domain
+
+
+
+//################### domain A1
+define(Anum, calc(round(Xi/cellsize)))
+define(Bnum45deg, Anum)
+define(Bnum90deg, calc(2.*Anum))
+define(Cnum90deg, Bnum90deg)
+define(Cnum45deg, Bnum45deg)
+//# cell width at x=Xi
+define(cw_Xi, cellsize)
+//################### domain A2,3
+//# length of B domain
+define(diagA,calc(Xi*sqrt(2)))
+define(l_Aa, calc(Xii-diagA)) 
+//# grading of B domain
+define(Aagrd,calc(Xii/diagA)) 
+//# computing radial number of cells
+define(logarg, calc((cw_Xi/l_Aa-1.)/(cw_Xi/l_Aa*Aagrd - 1.)))
+define(_Aanum, calc(1+log(Aagrd)/log(logarg)  ))
+define(Aanum, calc(round(_Aanum)))
+//# cell width at x=X
+define(cw_Xii, calc(cw_Xi*Aagrd))
+
+
+//################### domain B
+//# length of B domain
+define(l_B, calc(X-Xii)) 
+//# grading of B domain
+define(Bgrd,calc(X/Xii)) 
+//# computing radial number of cells
+define(logarg, calc((cw_Xii/l_B-1.)/(cw_Xii/l_B*Bgrd - 1.)))
+define(_Bnum, calc(1+log(Bgrd)/log(logarg)  ))
+define(Bnum, calc(round(_Bnum)))
+//# cell width at x=X
+define(cw_X, calc(cw_Xii*Bgrd))
+
+//################### domain C
+//# same for domain C
+define(l_C, calc(XF-X)) 
+define(Cgrd,calc(5.25*XF/X)) 
+//# we take double the size of the cell in C domain and half the amount of cells in angular direction
+define(cw_X_C, cw_X)
+//define(Cnum90deg, Bnum90deg)
+//
+define(logargC, calc((cw_X_C/l_C-1.)/(cw_X_C/l_C*Cgrd - 1.)))
+define(_Cnum, calc(1+log(Cgrd)/log(logargC)  ))
+define(Cnum, calc(round(_Cnum)))
+define(cw_XF, calc(cw_X_C*Cgrd))
+
+define(theta, calc(90./Bnum90deg/2.))   //# half of opening angle of wedge mesh such that A and B domain have cell ratios 1
+writeTheta(theta)
+
+define(rsx, calc(0.5*(Xi+Xi*cos(45./180.*PI))))
+
+//# l=left,r=right,f=front,b=back,t=top,d=down; Teildomänen durchnummeriert von unten nach oben
+//# Reihenfolge: domain-nummer-left/right-top/down-front/back
+vertices
+(
+
+    //# upside
+    (                    0              0                     0)      vlabel(A1ldf)
+    (                    0              0                     0)      vlabel(A1ldb)
+    (GCPx(Xi ,  0., theta)             0.  GCPz(Xi , 0., theta))      vlabel(A1rdf)
+    (GCPx(Xi ,  0.,-theta)             0.  GCPz(Xi , 0.,-theta))      vlabel(A1rdb)
+    (GCPx(Xi ,  0., theta)             Xi  GCPz(Xi , 0., theta))      vlabel(A1rtf)
+    (GCPx(Xi ,  0.,-theta)             Xi  GCPz(Xi , 0.,-theta))      vlabel(A1rtb)
+    (                    0             Xi                     0)      vlabel(A1ltf)
+    (                    0             Xi                     0)      vlabel(A1ltb)
+    
+    (GCPx(Xii,  0., theta) GCPy(Xii,  0.) GCPz(Xii,  0., theta))      vlabel(A2rdf)
+    (GCPx(Xii,  0.,-theta) GCPy(Xii,  0.) GCPz(Xii,  0.,-theta))      vlabel(A2rdb)
+    (GCPx(Xii, 45., theta) GCPy(Xii, 45.) GCPz(Xii, 45., theta))      vlabel(A2rtf)
+    (GCPx(Xii, 45.,-theta) GCPy(Xii, 45.) GCPz(Xii, 45.,-theta))      vlabel(A2rtb)
+    
+    (GCPx(Xii, 90., theta) GCPy(Xii, 90.) GCPz(Xii, 90., theta))      vlabel(A3rtf)
+    (GCPx(Xii, 90.,-theta) GCPy(Xii, 90.) GCPz(Xii, 90.,-theta))      vlabel(A3rtb)
+    
+    (GCPx(X  ,  0., theta) GCPy(X  ,  0.) GCPz(X  ,  0., theta))      vlabel(B1rdf)
+    (GCPx(X  ,  0.,-theta) GCPy(X  ,  0.) GCPz(X  ,  0.,-theta))      vlabel(B1rdb)
+    (GCPx(X  , 45., theta) GCPy(X  , 45.) GCPz(X  , 45., theta))      vlabel(B1rtf)
+    (GCPx(X  , 45.,-theta) GCPy(X  , 45.) GCPz(X  , 45.,-theta))      vlabel(B1rtb)
+            
+    (GCPx(X  , 90., theta) GCPy(X  , 90.) GCPz(X  , 90., theta))      vlabel(B2rtf)
+    (GCPx(X  , 90.,-theta) GCPy(X  , 90.) GCPz(X  , 90.,-theta))      vlabel(B2rtb)
+                                          
+    (GCPx(XF ,  0., theta) GCPy(XF ,  0.) GCPz(XF ,  0., theta))      vlabel(C1rdf)
+    (GCPx(XF ,  0.,-theta) GCPy(XF ,  0.) GCPz(XF ,  0.,-theta))      vlabel(C1rdb)
+    (GCPx(XF , 45., theta) GCPy(XF , 45.) GCPz(XF , 45., theta))      vlabel(C1rtf)
+    (GCPx(XF , 45.,-theta) GCPy(XF , 45.) GCPz(XF , 45.,-theta))      vlabel(C1rtb)
+                                               
+    (GCPx(XF , 90., theta) GCPy(XF , 90.) GCPz(XF , 90., theta))      vlabel(C2rtf)
+    (GCPx(XF , 90.,-theta) GCPy(XF , 90.) GCPz(XF , 90.,-theta))      vlabel(C2rtb)
+    
+    //# downside
+    (                    0              0                     0)      vlabel(dA1ltf)
+    (                    0              0                     0)      vlabel(dA1ltb)
+    (GCPx(Xi ,  0., theta)             0.  GCPz(Xi , 0., theta))      vlabel(dA1rtf)
+    (GCPx(Xi ,  0.,-theta)             0.  GCPz(Xi , 0.,-theta))      vlabel(dA1rtb)
+    (GCPx(Xi ,  0., theta)            -Xi  GCPz(Xi , 0., theta))      vlabel(dA1rdf)
+    (GCPx(Xi ,  0.,-theta)            -Xi  GCPz(Xi , 0.,-theta))      vlabel(dA1rdb)
+    (                    0            -Xi                     0)      vlabel(dA1ldf)
+    (                    0            -Xi                     0)      vlabel(dA1ldb)
+    
+    (GCPx(Xii,  0., theta) GCPy(Xii,  0.) GCPz(Xii,  0., theta))      vlabel(dA2rtf)
+    (GCPx(Xii,  0.,-theta) GCPy(Xii,  0.) GCPz(Xii,  0.,-theta))      vlabel(dA2rtb)
+    (GCPx(Xii,-45., theta) GCPy(Xii,-45.) GCPz(Xii,-45., theta))      vlabel(dA2rdf)
+    (GCPx(Xii,-45.,-theta) GCPy(Xii,-45.) GCPz(Xii,-45.,-theta))      vlabel(dA2rdb)
+
+    (GCPx(Xii,-90., theta) GCPy(Xii,-90.) GCPz(Xii,-90., theta))      vlabel(dA3rdf)
+    (GCPx(Xii,-90.,-theta) GCPy(Xii,-90.) GCPz(Xii,-90.,-theta))      vlabel(dA3rdb)
+
+    (GCPx(X  ,  0., theta) GCPy(X  ,  0.) GCPz(X  ,  0., theta))      vlabel(dB1rtf)
+    (GCPx(X  ,  0.,-theta) GCPy(X  ,  0.) GCPz(X  ,  0.,-theta))      vlabel(dB1rtb)
+    (GCPx(X  ,-45., theta) GCPy(X  ,-45.) GCPz(X  ,-45., theta))      vlabel(dB1rdf)
+    (GCPx(X  ,-45.,-theta) GCPy(X  ,-45.) GCPz(X  ,-45.,-theta))      vlabel(dB1rdb)
+
+    (GCPx(X  ,-90., theta) GCPy(X  ,-90.) GCPz(X  ,-90., theta))      vlabel(dB2rdf)
+    (GCPx(X  ,-90.,-theta) GCPy(X  ,-90.) GCPz(X  ,-90.,-theta))      vlabel(dB2rdb)
+
+    (GCPx(XF ,  0., theta) GCPy(XF ,  0.) GCPz(XF ,  0., theta))      vlabel(dC1rtf)
+    (GCPx(XF ,  0.,-theta) GCPy(XF ,  0.) GCPz(XF ,  0.,-theta))      vlabel(dC1rtb)
+    (GCPx(XF ,-45., theta) GCPy(XF ,-45.) GCPz(XF ,-45., theta))      vlabel(dC1rdf)
+    (GCPx(XF ,-45.,-theta) GCPy(XF ,-45.) GCPz(XF ,-45.,-theta))      vlabel(dC1rdb)
+
+    (GCPx(XF ,-90., theta) GCPy(XF ,-90.) GCPz(XF ,-90., theta))      vlabel(dC2rdf)
+    (GCPx(XF ,-90.,-theta) GCPy(XF ,-90.) GCPz(XF ,-90.,-theta))      vlabel(dC2rdb)
+);
+ 
+blocks
+( 
+  //# upside  
+  hex (A1ldf A1rdf A1rdb A1ldb   A1ltf A1rtf A1rtb A1ltb)  ( Anum 1      Anum) simpleGrading (    1 1 1)  //# A1
+  hex (A1rdf A2rdf A2rdb A1rdb   A1rtf A2rtf A2rtb A1rtb)  (Aanum 1 Bnum45deg) simpleGrading (Aagrd 1 1) //# A2
+  hex (A1rtf A2rtf A2rtb A1rtb   A1ltf A3rtf A3rtb A1ltb)  (Aanum 1 Bnum45deg) simpleGrading (Aagrd 1 1) //# A3
+  //# B                                                            
+  hex (A2rdf B1rdf B1rdb A2rdb   A2rtf B1rtf B1rtb A2rtb)  ( Bnum 1 Bnum45deg) simpleGrading (Bgrd  1 1) //# B1
+  hex (A2rtf B1rtf B1rtb A2rtb   A3rtf B2rtf B2rtb A3rtb)  ( Bnum 1 Bnum45deg) simpleGrading (Bgrd  1 1) //# B2
+  //# C                                                               
+  hex (B1rdf C1rdf C1rdb B1rdb   B1rtf C1rtf C1rtb B1rtb)  ( Cnum 1 Cnum45deg) simpleGrading (Cgrd  1 1) //# C1
+  hex (B1rtf C1rtf C1rtb B1rtb   B2rtf C2rtf C2rtb B2rtb)  ( Cnum 1 Cnum45deg) simpleGrading (Cgrd  1 1) //# C2
+  
+  //# downside  
+  hex (dA1ldf dA1rdf dA1rdb dA1ldb   dA1ltf dA1rtf dA1rtb dA1ltb)  ( Anum 1      Anum) simpleGrading (    1 1 1)  //# A1
+  hex (dA1rdf dA2rdf dA2rdb dA1rdb   dA1rtf dA2rtf dA2rtb dA1rtb)  (Aanum 1 Bnum45deg) simpleGrading (Aagrd 1 1) //# A2
+  hex (dA1ldf dA3rdf dA3rdb dA1ldb   dA1rdf dA2rdf dA2rdb dA1rdb)  (Aanum 1 Bnum45deg) simpleGrading (Aagrd 1 1) //# A3
+  //# B               
+  hex (dA2rdf dB1rdf dB1rdb dA2rdb   dA2rtf dB1rtf dB1rtb dA2rtb)  ( Bnum 1 Bnum45deg) simpleGrading (Bgrd  1 1) //# B1
+  hex (dA3rdf dB2rdf dB2rdb dA3rdb   dA2rdf dB1rdf dB1rdb dA2rdb)  ( Bnum 1 Bnum45deg) simpleGrading (Bgrd  1 1) //# B2
+  //# C                 
+  hex (dB1rdf dC1rdf dC1rdb dB1rdb   dB1rtf dC1rtf dC1rtb dB1rtb)  ( Cnum 1 Cnum45deg) simpleGrading (Cgrd  1 1) //# C1
+  hex (dB2rdf dC2rdf dC2rdb dB2rdb   dB1rdf dC1rdf dC1rdb dB1rdb)  ( Cnum 1 Cnum45deg) simpleGrading (Cgrd  1 1) //# C2
+);
+
+
+edges                  
+(
+  //#upside
+  arc C1rdf  C1rtf  (GCPx(XF , calc(45./2.       ), theta) GCPy(XF , calc(45./2.     )) GCPz(XF , calc(45./2.     ), theta)) //#edge1
+  arc C1rdb  C1rtb  (GCPx(XF , calc(45./2.       ),-theta) GCPy(XF , calc(45./2.     )) GCPz(XF , calc(45./2.     ),-theta)) //#edge2
+                                                                                                                  
+  arc C2rtf  C1rtf  (GCPx(XF , calc(45./2.+45.   ), theta) GCPy(XF , calc(45./2.+45. )) GCPz(XF , calc(45./2.+45. ), theta)) //#edge3
+  arc C2rtb  C1rtb  (GCPx(XF , calc(45./2.+45.   ),-theta) GCPy(XF , calc(45./2.+45. )) GCPz(XF , calc(45./2.+45. ),-theta)) //#edge4
+                                                                                                                  
+  arc B1rdf  B1rtf  (GCPx( X , calc(45./2.       ), theta) GCPy(X  , calc(45./2.     )) GCPz( X , calc(45./2.     ), theta)) //#edge5
+  arc B1rdb  B1rtb  (GCPx( X , calc(45./2.       ),-theta) GCPy(X  , calc(45./2.     )) GCPz( X , calc(45./2.     ),-theta)) //#edge6
+                                                                                                                  
+  arc B2rtf  B1rtf  (GCPx( X , calc(45./2.+45.   ), theta) GCPy(X  , calc(45./2.+45. )) GCPz( X , calc(45./2.+45. ), theta)) //#edge7
+  arc B2rtb  B1rtb  (GCPx( X , calc(45./2.+45.   ),-theta) GCPy(X  , calc(45./2.+45. )) GCPz( X , calc(45./2.+45. ),-theta)) //#edge8
+                                                                                                                  
+  arc A3rtf  A2rtf  (GCPx(Xii, calc(45./2.+45.   ), theta) GCPy(Xii, calc(45./2.+45. )) GCPz(Xii, calc(45./2.+45. ), theta)) //#edge9
+  arc A3rtb  A2rtb  (GCPx(Xii, calc(45./2.+45.   ),-theta) GCPy(Xii, calc(45./2.+45. )) GCPz(Xii, calc(45./2.+45. ),-theta)) //#edge10
+                                                                                                                  
+  arc A2rtf  A2rdf  (GCPx(Xii, calc(45./2.       ), theta) GCPy(Xii, calc(45./2.     )) GCPz(Xii, calc(45./2.     ), theta)) //#edge11
+  arc A2rtb  A2rdb  (GCPx(Xii, calc(45./2.       ),-theta) GCPy(Xii, calc(45./2.     )) GCPz(Xii, calc(45./2.     ),-theta)) //#edge12
+  
+  //#downside
+  arc dC1rdf  dC1rtf  (GCPx(XF , calc(-45./2.    ), theta) GCPy(XF , calc(-45./2.    )) GCPz(XF , calc(-45./2.    ), theta)) //#edge1
+  arc dC1rdb  dC1rtb  (GCPx(XF , calc(-45./2.    ),-theta) GCPy(XF , calc(-45./2.    )) GCPz(XF , calc(-45./2.    ),-theta)) //#edge2
+
+  arc dC2rdf  dC1rdf  (GCPx(XF , calc(-45./2.-45.), theta) GCPy(XF , calc(-45./2.-45.)) GCPz(XF , calc(-45./2.-45.), theta)) //#edge3
+  arc dC2rdb  dC1rdb  (GCPx(XF , calc(-45./2.-45.),-theta) GCPy(XF , calc(-45./2.-45.)) GCPz(XF , calc(-45./2.-45.),-theta)) //#edge4
+
+  arc dB1rdf  dB1rtf  (GCPx( X , calc(-45./2.    ), theta) GCPy(X  , calc(-45./2.    )) GCPz( X , calc(-45./2.    ), theta)) //#edge5
+  arc dB1rdb  dB1rtb  (GCPx( X , calc(-45./2.    ),-theta) GCPy(X  , calc(-45./2.    )) GCPz( X , calc(-45./2.    ),-theta)) //#edge6
+
+  arc dB2rdf  dB1rdf  (GCPx( X , calc(-45./2.-45.), theta) GCPy(X  , calc(-45./2.-45.)) GCPz( X , calc(-45./2.-45.), theta)) //#edge7
+  arc dB2rdb  dB1rdb  (GCPx( X , calc(-45./2.-45.),-theta) GCPy(X  , calc(-45./2.-45.)) GCPz( X , calc(-45./2.-45.),-theta)) //#edge8
+
+  arc dA3rdf  dA2rdf  (GCPx(Xii, calc(-45./2.-45.), theta) GCPy(Xii, calc(-45./2.-45.)) GCPz(Xii, calc(-45./2.-45.), theta)) //#edge9
+  arc dA3rdb  dA2rdb  (GCPx(Xii, calc(-45./2.-45.),-theta) GCPy(Xii, calc(-45./2.-45.)) GCPz(Xii, calc(-45./2.-45.),-theta)) //#edge10
+
+  arc dA2rdf  dA2rtf  (GCPx(Xii, calc(-45./2.    ), theta) GCPy(Xii, calc(-45./2.    )) GCPz(Xii, calc(-45./2.    ), theta)) //#edge11
+  arc dA2rdb  dA2rtb  (GCPx(Xii, calc(-45./2.    ),-theta) GCPy(Xii, calc(-45./2.    )) GCPz(Xii, calc(-45./2.    ),-theta)) //#edge12
+);
+ 
+patches
+(
+     wedge front
+     (    
+        //#upside
+           (A1ldf A1rdf A1rtf A1ltf) //#A1
+           (A1rdf A2rdf A2rtf A1rtf) //#A2
+           (A1ltf A1rtf A2rtf A3rtf) //#A3
+           
+           (A2rdf B1rdf B1rtf A2rtf) //#B1
+           (A2rtf B1rtf B2rtf A3rtf) //#B2
+           
+           (B1rdf C1rdf C1rtf B1rtf) //#C1
+           (B1rtf C1rtf C2rtf B2rtf) //#C2
+        //#downside
+           (dA1ldf dA1rdf dA1rtf dA1ltf) //#A1
+           (dA1rdf dA2rdf dA2rtf dA1rtf) //#A2
+           (dA1ldf dA3rdf dA2rdf dA1rdf) //#A3
+
+           (dA2rdf dB1rdf dB1rtf dA2rtf) //#B1
+           (dA3rdf dB2rdf dB1rdf dA2rdf) //#B2
+
+           (dB1rdf dC1rdf dC1rtf dB1rtf) //#C1
+           (dB2rdf dC2rdf dC1rdf dB1rdf) //#C2
+     )     
+           
+
+     wedge back
+     (
+        //#upside
+           (A1ldb A1rdb A1rtb A1ltb) //#A1
+           (A1rdb A2rdb A2rtb A1rtb) //#A2
+           (A1ltb A1rtb A2rtb A3rtb) //#A3
+           
+           (A2rdb B1rdb B1rtb A2rtb) //#B1
+           (A2rtb B1rtb B2rtb A3rtb) //#B2
+           
+           (B1rdb C1rdb C1rtb B1rtb) //#C1
+           (B1rtb C1rtb C2rtb B2rtb) //#C2
+        //#downside
+           (dA1ldb dA1rdb dA1rtb dA1ltb) //#A1
+           (dA1rdb dA2rdb dA2rtb dA1rtb) //#A2
+           (dA1ldb dA3rdb dA2rdb dA1rdb) //#A3
+
+           (dA2rdb dB1rdb dB1rtb dA2rtb) //#B1
+           (dA3rdb dB2rdb dB1rdb dA2rdb) //#B2
+
+           (dB1rdb dC1rdb dC1rtb dB1rtb) //#C1
+           (dB2rdb dC2rdb dC1rdb dB1rdb) //#C2
+     )
+     
+     patch side
+     (  
+        //#upside          
+            (C1rdf C1rdb C1rtb C1rtf) //#C1
+            (C1rtf C1rtb C2rtb C2rtf) //#C2  
+        //#downside          
+            (dC1rdf dC1rdb dC1rtb dC1rtf) //#C1
+            (dC2rdf dC2rdb dC1rdb dC1rdf) //#C2
+     )
+     
+     patch wall
+     (
+        //#upside 
+            (A1ldf A1ldb A1rdb A1rdf) //#A1     
+            (A1rdf A1rdb A2rdb A2rdf) //#A2
+            (A2rdf A2rdb B1rdb B1rdf) //#B1
+            (B1rdf B1rdb C1rdb C1rdf) //#C1
+     )
+     empty wall2
+     (
+        //#downside 
+            (dA1ltf dA1ltb dA1rtb dA1rtf) //#A1     
+            (dA1rtf dA1rtb dA2rtb dA2rtf) //#A2
+            (dA2rtf dA2rtb dB1rtb dB1rtf) //#B1
+            (dB1rtf dB1rtb dC1rtb dC1rtf) //#C1
+     )
+
+     empty axis
+     (
+        //#upside 
+           (A1ldf A1ltf A1ltb A1ldb) //#A1
+           (A1ltf A3rtf A3rtb A1ltb) //#A3
+           (A3rtf B2rtf B2rtb A3rtb) //#B2
+           (B2rtf C2rtf C2rtb B2rtb) //#C2
+        //#downside 
+           (dA1ldf dA1ltf dA1ltb dA1ldb) //#A1
+           (dA1ldf dA3rdf dA3rdb dA1ldb) //#A3
+           (dA3rdf dB2rdf dB2rdb dA3rdb) //#B2
+           (dB2rdf dC2rdf dC2rdb dB2rdb) //#C2
+     )
+);   
+     
+
+mergePatchPairs
+(
+);                       
+
+//// cell width at Xi:
+//cw_Xi
+//// meaning a timestep of...
+//calc(0.4*cw_Xi/200)
+//// ... for 200 m/s at smallest cell and maxCo=0.4
+
+

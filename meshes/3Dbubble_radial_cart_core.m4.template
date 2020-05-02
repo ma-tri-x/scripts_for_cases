@@ -1,0 +1,519 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+ 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'use Math::Trig; use Math::Round; printf ($1)')])
+define(write, [esyscmd(sed -i "s#$1#$2#g" the3Dmesh.json)])
+define(PI, 3.14159265358979323846264338327950288)
+
+//# define function to get circle point coordinates when having origin in (0 0 0)
+//# GCP = getCirclePoint
+//# GCPx = R * cos(phi [deg]) * cos(theta [rad]
+define(GCPx, [calc(($1)*cos( ($2)/180.*PI ) *cos(($3)/180.*PI))])
+define(GCPy, [calc(($1)*sin( ($2)/180.*PI ))])
+define(GCPz, [calc(($1)*cos( ($2)/180.*PI ) *sin(($3)/180.*PI))])
+
+
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+
+
+
+//# parameters that drive the mesh:
+define(wd, _BUBBLE-D_INIT)              // distance of bubble center to rigid wall (only for comparison)
+define(Rmax, _BUBBLE-RMAX)
+define(X, calc(_MESH-FACTORBUBBLEDOMAINRMAX * Rmax))                     // bubble domain im (domain B)
+define(XF,calc(_MESH-DOMAINSIZEFACTORRMAX * Rmax))              // mesh end (domain C)
+define(cellsize, _MESH-CELLSIZE)      // angular number of cells in B domain
+define(Rstart, _BUBBLE-RSTART)
+define(cartLen, calc(.1*Rmax))  // edge length of inner cartesian core bottom side. Must be > 2*Rstart
+define(cartHgt, calc(cartLen+wd)) // height of inner kartesian core
+define(Xi, calc(1./sqrt(2)*cartLen))
+define(dHgt, calc(sqrt(Xi*Xi+cartHgt*cartHgt))) // length between origin and upper corner of inner cart core
+define(Xii, calc(1.1*dHgt))
+
+
+//################### inner cartesian core with half diagonal of bottom plate: Xi
+define(numXZ, calc(round(cartLen/cellsize/2.)*2.))
+define(numY,  calc(round(cartHgt/cellsize/2.)*2.))
+define(Xim, calc(0.5*sqrt(cartLen*cartLen + cartHgt*cartHgt))) // distance from middle point of cartesian core to middle of edge at top
+define(angY,  calc(atan(cartHgt/Xi)/PI*180.))
+define(angYm, calc(atan(cartHgt/cartLen)/PI*180.))
+define(angYu, calc(atan(cartHgt/(cartLen/2.))/PI*180.))
+define(angYi, calc(atan(0.5*cartHgt/Xi)/PI*180.))
+define(angYl, calc(asin(0.5*cartHgt/Xii)/PI*180.))
+//# Origin for GCOi functions:
+define(Ox, 0.)
+define(Oy, calc(0.5*cartHgt))
+define(Oz, 0.)
+
+define(GCOx, [calc(($1)*cos( ($2)/180.*PI ) *cos(($3)/180.*PI) + Ox)])
+define(GCOy, [calc(($1)*sin( ($2)/180.*PI ) + Oy)])
+define(GCOz, [calc(($1)*cos( ($2)/180.*PI ) *sin(($3)/180.*PI) + Oz)])
+
+
+//################### domain B around inner core to regularize the cartesian grid towards the radial grid
+//# B1,2,3,4:
+define(Blen, calc(Xii-0.5*cartLen)) //length on bottom (XZ-plane) used for the amount of cells in B1,2,3,4
+define(BradNum, calc(round(Blen/cellsize)))
+//#B5:
+define(B5len, calc(Xii-cartHgt)) //length in Y direction of B5
+define(B5radNum, calc(round(B5len/cellsize)))
+
+//################### domain C
+define(cw_Xii, cellsize)
+//# length of domain C
+define(l_C, calc(X-Xii))
+//# grading of C domain
+define(Cgrd,calc(X/Xii)) 
+//# computing radial number of cells
+define(logarg, calc((cw_Xii/l_C-1.)/(cw_Xii/l_C*Cgrd - 1.)))
+define(_Cnum, calc(1+log(Cgrd)/log(logarg)  ))
+define(Cnum, calc(round(_Cnum)))
+//# cell width at x=X
+define(cw_X, calc(cw_Xii*Cgrd))
+//
+define(angCl, calc(asin(0.5*cartHgt/X)/PI*180.))
+
+//################### domain D
+//# length of domain D
+define(l_D, calc(XF-X))
+//# grading of C domain
+define(Dgrd,calc(XF/X)) 
+//# computing radial number of cells
+define(logarg, calc((cw_X/l_D-1.)/(cw_X/l_D*Dgrd - 1.)))
+define(_Dnum, calc(1+log(Dgrd)/log(logarg)  ))
+define(Dnum, calc(round(_Dnum)))
+//# cell width at x=X
+define(cw_XF, calc(cw_X*Dgrd))
+define(angDl, calc(asin(0.5*cartHgt/XF)/PI*180.))
+
+write(THEx,numXZ)
+write(THEY,numY)
+write(THEZ,numXZ)
+write(THEB,BradNum)
+write(THECGRD,Cgrd)
+write(THEDGRD,Dgrd)
+write(THEC,Cnum)
+write(THED,Dnum)
+write(THEL,cartLen)
+write(THEH,cartHgt)
+write(THEXII,Xii)
+write(THEXF,XF)
+write(THEX,X)
+write(CELLSIZE,cellsize)
+
+//# l=left,r=right,f=front,b=back,t=top,d=down; Teildomänen durchnummeriert von oben nach unten
+//# Reihenfolge: domain-nummer-left/right-top/down-front/back
+vertices
+(
+    //#A1
+    (GCPx(Xi  ,    0.,  45.)  GCPy(Xi  ,    0.,  45.)  GCPz(Xi  ,    0.,  45.))      vlabel(A1rdf)
+    (GCPx(Xi  ,    0., 135.)  GCPy(Xi  ,    0., 135.)  GCPz(Xi  ,    0., 135.))      vlabel(A1ldf)
+    (GCPx(Xi  ,    0.,-135.)  GCPy(Xi  ,    0.,-135.)  GCPz(Xi  ,    0.,-135.))      vlabel(A1ldb)
+    (GCPx(Xi  ,    0.,- 45.)  GCPy(Xi  ,    0.,- 45.)  GCPz(Xi  ,    0.,- 45.))      vlabel(A1rdb)
+                                                                   
+    (GCPx(dHgt,  angY,  45.)  GCPy(dHgt,  angY,  45.)  GCPz(dHgt,  angY,  45.))      vlabel(A1rtf)
+    (GCPx(dHgt,  angY, 135.)  GCPy(dHgt,  angY, 135.)  GCPz(dHgt,  angY, 135.))      vlabel(A1ltf)
+    (GCPx(dHgt,  angY,-135.)  GCPy(dHgt,  angY,-135.)  GCPz(dHgt,  angY,-135.))      vlabel(A1ltb)
+    (GCPx(dHgt,  angY,- 45.)  GCPy(dHgt,  angY,- 45.)  GCPz(dHgt,  angY,- 45.))      vlabel(A1rtb)
+    
+    //#B1
+    (GCOx(Xii ,-angYl,  45.)  GCOy(Xii ,-angYl,  45.)  GCOz(Xii ,-angYl,  45.))      vlabel(B1rdf)
+    (GCOx(Xii ,-angYl,- 45.)  GCOy(Xii ,-angYl,- 45.)  GCOz(Xii ,-angYl,- 45.))      vlabel(B1rdb)
+    (GCOx(Xii , angYi,  45.)  GCOy(Xii , angYi,  45.)  GCOz(Xii , angYi,  45.))      vlabel(B1rtf)
+    (GCOx(Xii , angYi,- 45.)  GCOy(Xii , angYi,- 45.)  GCOz(Xii , angYi,- 45.))      vlabel(B1rtb)
+      //
+    (GCOx(Xim , angYm,   0.)  GCOy(Xim , angYm,   0.)  GCOz(Xim , angYm,   0.))      vlabel(B1ltm)  // angYm = atan(cartHgt/cartLen)/PI*180. = angle from center of core to edge middle point
+    (GCOx(Xii , angYi,   0.)  GCOy(Xii , angYi,   0.)  GCOz(Xii , angYi,   0.))      vlabel(B1rtm)  // angYi = atan(0.5*cartHgt/Xi)/PI*180. = angle from center of core to corner point
+    
+    //#B2
+    (GCOx(Xii ,-angYl,-135.)  GCOy(Xii ,-angYl,-135.)  GCOz(Xii ,-angYl,-135.))      vlabel(B2ldb)
+    (GCOx(Xii , angYi,-135.)  GCOy(Xii , angYi,-135.)  GCOz(Xii , angYi,-135.))      vlabel(B2ltb)
+      //
+    (GCOx(Xii , angYi,- 90.)  GCOy(Xii , angYi,- 90.)  GCOz(Xii , angYi,- 90.))      vlabel(B2mtb)
+    (GCOx(Xim , angYm,- 90.)  GCOy(Xim , angYm,- 90.)  GCOz(Xim , angYm,- 90.))      vlabel(B2mtf)
+    
+    //#B3
+    (GCOx(Xii ,-angYl, 135.)  GCOy(Xii ,-angYl, 135.)  GCOz(Xii ,-angYl, 135.))      vlabel(B3ldf)
+    (GCOx(Xii , angYi, 135.)  GCOy(Xii , angYi, 135.)  GCOz(Xii , angYi, 135.))      vlabel(B3ltf)
+      //
+    (GCOx(Xii , angYi, 180.)  GCOy(Xii , angYi, 180.)  GCOz(Xii , angYi, 180.))      vlabel(B3ltm)
+    (GCOx(Xim , angYm, 180.)  GCOy(Xim , angYm, 180.)  GCOz(Xim , angYm, 180.))      vlabel(B3rtm)
+    
+    //#B4
+    (GCOx(Xii , angYi,  90.)  GCOy(Xii , angYi,  90.)  GCOz(Xii , angYi,  90.))      vlabel(B4mtf)
+    (GCOx(Xim , angYm,  90.)  GCOy(Xim , angYm,  90.)  GCOz(Xim , angYm,  90.))      vlabel(B4mtb)
+    
+    //#B5
+    (                   0.0     calc(0.5*cartHgt+Xii)                     0.0 )      vlabel(B5mtt)
+    (                   0.0                  cartHgt                      0.0 )      vlabel(B5mtd)
+    
+    
+    
+    
+    
+    //#C1
+    (GCOx(X   ,-angCl,  45.)  GCOy(X   ,-angCl,  45.)  GCOz(X   ,-angCl,  45.))      vlabel(C1rdf)
+    (GCOx(X   ,-angCl,- 45.)  GCOy(X   ,-angCl,- 45.)  GCOz(X   ,-angCl,- 45.))      vlabel(C1rdb)
+    (GCOx(X   , angYu,  45.)  GCOy(X   , angYu,  45.)  GCOz(X   , angYu,  45.))      vlabel(C1rtf)
+    (GCOx(X   , angYu,- 45.)  GCOy(X   , angYu,- 45.)  GCOz(X   , angYu,- 45.))      vlabel(C1rtb)
+      //
+    (GCOx(X   , angYu,   0.)  GCOy(X   , angYu,   0.)  GCOz(X   , angYu,   0.))      vlabel(C1rtm)  
+    
+    //#C2
+    (GCOx(X   ,-angCl,-135.)  GCOy(X   ,-angCl,-135.)  GCOz(X   ,-angCl,-135.))      vlabel(C2ldb)
+    (GCOx(X   , angYu,-135.)  GCOy(X   , angYu,-135.)  GCOz(X   , angYu,-135.))      vlabel(C2ltb)
+      //
+    (GCOx(X   , angYu,- 90.)  GCOy(X   , angYu,- 90.)  GCOz(X   , angYu,- 90.))      vlabel(C2mtb)
+    
+    //#C3
+    (GCOx(X   ,-angCl, 135.)  GCOy(X   ,-angCl, 135.)  GCOz(X   ,-angCl, 135.))      vlabel(C3ldf)
+    (GCOx(X   , angYu, 135.)  GCOy(X   , angYu, 135.)  GCOz(X   , angYu, 135.))      vlabel(C3ltf)
+      //
+    (GCOx(X   , angYu, 180.)  GCOy(X   , angYu, 180.)  GCOz(X   , angYu, 180.))      vlabel(C3ltm)
+    
+    //#C4
+    (GCOx(X   , angYu,  90.)  GCOy(X   , angYu,  90.)  GCOz(X   , angYu,  90.))      vlabel(C4mtf)
+    
+    //#C5
+    (                   0.0     calc(0.5*cartHgt+X  )                     0.0 )      vlabel(C5mtt)
+    
+    //#D1
+    (GCOx(XF  ,-angDl,  45.)  GCOy(XF  ,-angDl,  45.)  GCOz(XF  ,-angDl,  45.))      vlabel(D1rdf)
+    (GCOx(XF  ,-angDl,- 45.)  GCOy(XF  ,-angDl,- 45.)  GCOz(XF  ,-angDl,- 45.))      vlabel(D1rdb)
+    (GCOx(XF  , angYu,  45.)  GCOy(XF  , angYu,  45.)  GCOz(XF  , angYu,  45.))      vlabel(D1rtf)
+    (GCOx(XF  , angYu,- 45.)  GCOy(XF  , angYu,- 45.)  GCOz(XF  , angYu,- 45.))      vlabel(D1rtb)
+      //
+    (GCOx(XF  , angYu,   0.)  GCOy(XF  , angYu,   0.)  GCOz(XF  , angYu,   0.))      vlabel(D1rtm)  
+    
+    //#D2
+    (GCOx(XF  ,-angDl,-135.)  GCOy(XF  ,-angDl,-135.)  GCOz(XF  ,-angDl,-135.))      vlabel(D2ldb)
+    (GCOx(XF  , angYu,-135.)  GCOy(XF  , angYu,-135.)  GCOz(XF  , angYu,-135.))      vlabel(D2ltb)
+      //
+    (GCOx(XF  , angYu,- 90.)  GCOy(XF  , angYu,- 90.)  GCOz(XF  , angYu,- 90.))      vlabel(D2mtb)
+    
+    //#D3
+    (GCOx(XF  ,-angDl, 135.)  GCOy(XF  ,-angDl, 135.)  GCOz(XF  ,-angDl, 135.))      vlabel(D3ldf)
+    (GCOx(XF  , angYu, 135.)  GCOy(XF  , angYu, 135.)  GCOz(XF  , angYu, 135.))      vlabel(D3ltf)
+      //   
+    (GCOx(XF  , angYu, 180.)  GCOy(XF  , angYu, 180.)  GCOz(XF  , angYu, 180.))      vlabel(D3ltm)
+           
+    //#D4  
+    (GCOx(XF  , angYu,  90.)  GCOy(XF  , angYu,  90.)  GCOz(XF  , angYu,  90.))      vlabel(D4mtf)
+    
+    //#D5
+    (                   0.0     calc(0.5*cartHgt+XF )                     0.0 )      vlabel(D5mtt)
+    
+);
+ 
+blocks
+(
+  hex (A1ldf A1rdf A1rdb A1ldb  A1ltf A1rtf A1rtb A1ltb)  (numXZ numXZ numY)     simpleGrading (1 1 1) //# A1
+                  
+  //# B1f           
+  hex (A1rdf A1rdb A1rtb A1rtf  B1rdf B1rdb B1rtb B1rtf)  (numXZ numY BradNum)   simpleGrading (1 1 1)
+  //# B2
+  hex (A1rdb A1ldb A1ltb A1rtb  B1rdb B2ldb B2ltb B1rtb)  (numXZ numY BradNum)   simpleGrading (1 1 1)
+  //# B3
+  hex (A1ldb A1ldf A1ltf A1ltb  B2ldb B3ldf B3ltf B2ltb)  (numXZ numY BradNum)   simpleGrading (1 1 1)
+  //# B4
+  hex (A1ldf A1rdf A1rtf A1ltf  B3ldf B1rdf B1rtf B3ltf)  (numXZ numY BradNum)   simpleGrading (1 1 1)
+  //# B5
+  hex (B4mtb A1rtf B1ltm B5mtd  B4mtf B1rtf B1rtm B5mtt)  (calc(numXZ/2) calc(numXZ/2) BradNum) simpleGrading (1 1 1)
+  hex (B5mtd B1ltm A1rtb B2mtf  B5mtt B1rtm B1rtb B2mtb)  (calc(numXZ/2) calc(numXZ/2) BradNum) simpleGrading (1 1 1)
+  hex (B3rtm B5mtd B2mtf A1ltb  B3ltm B5mtt B2mtb B2ltb)  (calc(numXZ/2) calc(numXZ/2) BradNum) simpleGrading (1 1 1)
+  hex (A1ltf B4mtb B5mtd B3rtm  B3ltf B4mtf B5mtt B3ltm)  (calc(numXZ/2) calc(numXZ/2) BradNum) simpleGrading (1 1 1)
+  //#C1
+  hex (B1rdf B1rdb B1rtb B1rtf  C1rdf C1rdb C1rtb C1rtf)  (numXZ numY Cnum)   simpleGrading (1 1 Cgrd)
+  //#C2
+  hex (B1rdb B2ldb B2ltb B1rtb  C1rdb C2ldb C2ltb C1rtb)  (numXZ numY Cnum)   simpleGrading (1 1 Cgrd)
+  //# C3
+  hex (B2ldb B3ldf B3ltf B2ltb  C2ldb C3ldf C3ltf C2ltb)  (numXZ numY Cnum)   simpleGrading (1 1 Cgrd)
+  //# C4
+  hex (B3ldf B1rdf B1rtf B3ltf  C3ldf C1rdf C1rtf C3ltf)  (numXZ numY Cnum)   simpleGrading (1 1 Cgrd)
+  //# C5
+  hex (B4mtf B1rtf B1rtm B5mtt  C4mtf C1rtf C1rtm C5mtt)  (calc(numXZ/2) calc(numXZ/2) Cnum) simpleGrading (1 1 Cgrd)
+  hex (B5mtt B1rtm B1rtb B2mtb  C5mtt C1rtm C1rtb C2mtb)  (calc(numXZ/2) calc(numXZ/2) Cnum) simpleGrading (1 1 Cgrd)
+  hex (B3ltm B5mtt B2mtb B2ltb  C3ltm C5mtt C2mtb C2ltb)  (calc(numXZ/2) calc(numXZ/2) Cnum) simpleGrading (1 1 Cgrd)
+  hex (B3ltf B4mtf B5mtt B3ltm  C3ltf C4mtf C5mtt C3ltm)  (calc(numXZ/2) calc(numXZ/2) Cnum) simpleGrading (1 1 Cgrd)
+  //#D1
+  hex (C1rdf C1rdb C1rtb C1rtf  D1rdf D1rdb D1rtb D1rtf)  (numXZ numY Dnum)   simpleGrading (1 1 Dgrd)
+  //#D2
+  hex (C1rdb C2ldb C2ltb C1rtb  D1rdb D2ldb D2ltb D1rtb)  (numXZ numY Dnum)   simpleGrading (1 1 Dgrd)
+  
+  //# D3
+  hex (C2ldb C3ldf C3ltf C2ltb  D2ldb D3ldf D3ltf D2ltb)  (numXZ numY Dnum)   simpleGrading (1 1 Dgrd)
+  //# D4
+  hex (C3ldf C1rdf C1rtf C3ltf  D3ldf D1rdf D1rtf D3ltf)  (numXZ numY Dnum)   simpleGrading (1 1 Dgrd)
+  //# D5
+  hex (C4mtf C1rtf C1rtm C5mtt  D4mtf D1rtf D1rtm D5mtt)  (calc(numXZ/2) calc(numXZ/2) Dnum) simpleGrading (1 1 Dgrd)
+  hex (C5mtt C1rtm C1rtb C2mtb  D5mtt D1rtm D1rtb D2mtb)  (calc(numXZ/2) calc(numXZ/2) Dnum) simpleGrading (1 1 Dgrd)
+  hex (C3ltm C5mtt C2mtb C2ltb  D3ltm D5mtt D2mtb D2ltb)  (calc(numXZ/2) calc(numXZ/2) Dnum) simpleGrading (1 1 Dgrd)
+  hex (C3ltf C4mtf C5mtt C3ltm  D3ltf D4mtf D5mtt D3ltm)  (calc(numXZ/2) calc(numXZ/2) Dnum) simpleGrading (1 1 Dgrd)
+);
+
+  
+edges                  
+(
+    //#B1
+    arc B1rdf  B1rtf  (GCOx(Xii ,calc(      0.),  45.) GCOy(Xii ,calc(      0.),  45.) GCOz(Xii ,calc(      0.),  45.))
+    arc B1rdb  B1rtb  (GCOx(Xii ,calc(      0.),- 45.) GCOy(Xii ,calc(      0.),- 45.) GCOz(Xii ,calc(      0.),- 45.))
+    arc B1rtf  B1rtb  (GCOx(Xii ,calc(   angYi),   0.) GCOy(Xii ,calc(   angYi),   0.) GCOz(Xii ,calc(   angYi),   0.))
+    arc B1rdf  B1rdb  (GCOx(Xii ,calc(  -angYl),   0.) GCOy(Xii ,calc(  -angYl),   0.) GCOz(Xii ,calc(  -angYl),   0.))
+    //#B2                                                                                              
+    arc B2ldb  B2ltb  (GCOx(Xii ,calc(      0.),-135.) GCOy(Xii ,calc(      0.),-135.) GCOz(Xii ,calc(      0.),-135.))
+    arc B1rdb  B2ldb  (GCOx(Xii ,calc(  -angYl),- 90.) GCOy(Xii ,calc(  -angYl),- 90.) GCOz(Xii ,calc(  -angYl),- 90.))
+    arc B1rtb  B2ltb  (GCOx(Xii ,calc(   angYi),- 90.) GCOy(Xii ,calc(   angYi),- 90.) GCOz(Xii ,calc(   angYi),- 90.))
+    //#B3                                                                                              
+    arc B3ldf  B3ltf  (GCOx(Xii ,calc(      0.), 135.) GCOy(Xii ,calc(      0.), 135.) GCOz(Xii ,calc(      0.), 135.))
+    arc B2ldb  B3ldf  (GCOx(Xii ,calc(  -angYl),-180.) GCOy(Xii ,calc(  -angYl),-180.) GCOz(Xii ,calc(  -angYl),-180.))
+    arc B2ltb  B3ltf  (GCOx(Xii ,calc(   angYi),-180.) GCOy(Xii ,calc(   angYi),-180.) GCOz(Xii ,calc(   angYi),-180.))
+    //#B4                                                                                              
+    arc B3ldf  B1rdf  (GCOx(Xii ,calc(  -angYl),  90.) GCOy(Xii ,calc(  -angYl),  90.) GCOz(Xii ,calc(  -angYl),  90.))
+    arc B3ltf  B1rtf  (GCOx(Xii ,calc(   angYi),  90.) GCOy(Xii ,calc(   angYi),  90.) GCOz(Xii ,calc(   angYi),  90.))
+    //#B5                                                                                              
+       //circle
+    arc B4mtf  B1rtf  (GCOx(Xii ,calc(   angYi), 67.5) GCOy(Xii ,calc(   angYi), 67.5) GCOz(Xii ,calc(   angYi), 67.5))
+    arc B1rtf  B1rtm  (GCOx(Xii ,calc(   angYi), 22.5) GCOy(Xii ,calc(   angYi), 22.5) GCOz(Xii ,calc(   angYi), 22.5))
+    arc B1rtm  B1rtb  (GCOx(Xii ,calc(   angYi),-22.5) GCOy(Xii ,calc(   angYi),-22.5) GCOz(Xii ,calc(   angYi),-22.5))
+    arc B1rtb  B2mtb  (GCOx(Xii ,calc(   angYi),-67.5) GCOy(Xii ,calc(   angYi),-67.5) GCOz(Xii ,calc(   angYi),-67.5))
+    arc B2mtb  B2ltb  (GCOx(Xii ,calc(   angYi),-112.) GCOy(Xii ,calc(   angYi),-112.) GCOz(Xii ,calc(   angYi),-112.))
+    arc B2ltb  B3ltm  (GCOx(Xii ,calc(   angYi),-157.) GCOy(Xii ,calc(   angYi),-157.) GCOz(Xii ,calc(   angYi),-157.))
+    arc B3ltm  B3ltf  (GCOx(Xii ,calc(   angYi), 156.) GCOy(Xii ,calc(   angYi), 156.) GCOz(Xii ,calc(   angYi), 156.))
+    arc B3ltf  B4mtf  (GCOx(Xii ,calc(   angYi), 112.) GCOy(Xii ,calc(   angYi), 112.) GCOz(Xii ,calc(   angYi), 112.))
+       //inner tripod
+    arc B4mtf  B5mtt  (GCOx(Xii ,calc(5.+angYi), 90.0) GCOy(Xii ,calc(5.+angYi), 90.0) GCOz(Xii ,calc(5.+angYi), 90.0))
+    arc B1rtm  B5mtt  (GCOx(Xii ,calc(5.+angYi),  0.0) GCOy(Xii ,calc(5.+angYi),  0.0) GCOz(Xii ,calc(5.+angYi),  0.0))
+    arc B2mtb  B5mtt  (GCOx(Xii ,calc(5.+angYi), 90.0) GCOy(Xii ,calc(5.+angYi), 90.0) GCOz(Xii ,calc(5.+angYi), 90.0))
+    arc B3ltm  B5mtt  (GCOx(Xii ,calc(5.+angYi),180.0) GCOy(Xii ,calc(5.+angYi),180.0) GCOz(Xii ,calc(5.+angYi),180.0))
+    
+    
+    //#C1
+    arc C1rdf  C1rtf  (GCOx(X   ,calc(      0.),  45.) GCOy(X   ,calc(      0.),  45.) GCOz(X   ,calc(      0.),  45.))
+    arc C1rdb  C1rtb  (GCOx(X   ,calc(      0.),- 45.) GCOy(X   ,calc(      0.),- 45.) GCOz(X   ,calc(      0.),- 45.))
+    arc C1rtf  C1rtb  (GCOx(X   ,calc(   angYu),   0.) GCOy(X   ,calc(   angYu),   0.) GCOz(X   ,calc(   angYu),   0.))
+    arc C1rdf  C1rdb  (GCOx(X   ,calc(  -angCl),   0.) GCOy(X   ,calc(  -angCl),   0.) GCOz(X   ,calc(  -angCl),   0.))
+    //#C2                                                                                              
+    arc C2ldb  C2ltb  (GCOx(X   ,calc(      0.),-135.) GCOy(X   ,calc(      0.),-135.) GCOz(X   ,calc(      0.),-135.))
+    arc C1rdb  C2ldb  (GCOx(X   ,calc(  -angCl),- 90.) GCOy(X   ,calc(  -angCl),- 90.) GCOz(X   ,calc(  -angCl),- 90.))
+    arc C1rtb  C2ltb  (GCOx(X   ,calc(   angYu),- 90.) GCOy(X   ,calc(   angYu),- 90.) GCOz(X   ,calc(   angYu),- 90.))
+    //#C3
+    arc C3ldf  C3ltf  (GCOx(X   ,calc(      0.), 135.) GCOy(X   ,calc(      0.), 135.) GCOz(X   ,calc(      0.), 135.))
+    arc C2ldb  C3ldf  (GCOx(X   ,calc(  -angCl),-180.) GCOy(X   ,calc(  -angCl),-180.) GCOz(X   ,calc(  -angCl),-180.))
+    arc C2ltb  C3ltf  (GCOx(X   ,calc(   angYu),-180.) GCOy(X   ,calc(   angYu),-180.) GCOz(X   ,calc(   angYu),-180.))
+    //#C4                                                                                              
+    arc C3ldf  C1rdf  (GCOx(X   ,calc(  -angCl),  90.) GCOy(X   ,calc(  -angCl),  90.) GCOz(X   ,calc(  -angCl),  90.))
+    arc C3ltf  C1rtf  (GCOx(X   ,calc(   angYu),  90.) GCOy(X   ,calc(   angYu),  90.) GCOz(X   ,calc(   angYu),  90.))
+    //#C5
+       //circle
+    arc C4mtf  C1rtf  (GCOx(X   ,calc(   angYu), 67.5) GCOy(X   ,calc(   angYu), 67.5) GCOz(X   ,calc(   angYu), 67.5))
+    arc C1rtf  C1rtm  (GCOx(X   ,calc(   angYu), 22.5) GCOy(X   ,calc(   angYu), 22.5) GCOz(X   ,calc(   angYu), 22.5))
+    arc C1rtm  C1rtb  (GCOx(X   ,calc(   angYu),-22.5) GCOy(X   ,calc(   angYu),-22.5) GCOz(X   ,calc(   angYu),-22.5))
+    arc C1rtb  C2mtb  (GCOx(X   ,calc(   angYu),-67.5) GCOy(X   ,calc(   angYu),-67.5) GCOz(X   ,calc(   angYu),-67.5))
+    arc C2mtb  C2ltb  (GCOx(X   ,calc(   angYu),-112.) GCOy(X   ,calc(   angYu),-112.) GCOz(X   ,calc(   angYu),-112.))
+    arc C2ltb  C3ltm  (GCOx(X   ,calc(   angYu),-157.) GCOy(X   ,calc(   angYu),-157.) GCOz(X   ,calc(   angYu),-157.))
+    arc C3ltm  C3ltf  (GCOx(X   ,calc(   angYu), 156.) GCOy(X   ,calc(   angYu), 156.) GCOz(X   ,calc(   angYu), 156.))
+    arc C3ltf  C4mtf  (GCOx(X   ,calc(   angYu), 112.) GCOy(X   ,calc(   angYu), 112.) GCOz(X   ,calc(   angYu), 112.))
+       //inner tripod
+    arc C4mtf  C5mtt  (GCOx(X   ,calc(5.+angYu), 90.0) GCOy(X   ,calc(5.+angYu), 90.0) GCOz(X   ,calc(5.+angYu), 90.0))
+    arc C1rtm  C5mtt  (GCOx(X   ,calc(5.+angYu),  0.0) GCOy(X   ,calc(5.+angYu),  0.0) GCOz(X   ,calc(5.+angYu),  0.0))
+    arc C2mtb  C5mtt  (GCOx(X   ,calc(5.+angYu), 90.0) GCOy(X   ,calc(5.+angYu), 90.0) GCOz(X   ,calc(5.+angYu), 90.0))
+    arc C3ltm  C5mtt  (GCOx(X   ,calc(5.+angYu),180.0) GCOy(X   ,calc(5.+angYu),180.0) GCOz(X   ,calc(5.+angYu),180.0))
+    
+    //#D1
+    arc D1rdf  D1rtf  (GCOx(XF  ,calc(      0.),  45.) GCOy(XF  ,calc(      0.),  45.) GCOz(XF  ,calc(      0.),  45.))
+    arc D1rdb  D1rtb  (GCOx(XF  ,calc(      0.),- 45.) GCOy(XF  ,calc(      0.),- 45.) GCOz(XF  ,calc(      0.),- 45.))
+    arc D1rtf  D1rtb  (GCOx(XF  ,calc(   angYu),   0.) GCOy(XF  ,calc(   angYu),   0.) GCOz(XF  ,calc(   angYu),   0.))
+    arc D1rdf  D1rdb  (GCOx(XF  ,calc(  -angDl),   0.) GCOy(XF  ,calc(  -angDl),   0.) GCOz(XF  ,calc(  -angDl),   0.))
+    //#D2                                                                                              
+    arc D2ldb  D2ltb  (GCOx(XF  ,calc(      0.),-135.) GCOy(XF  ,calc(      0.),-135.) GCOz(XF  ,calc(      0.),-135.))
+    arc D1rdb  D2ldb  (GCOx(XF  ,calc(  -angDl),- 90.) GCOy(XF  ,calc(  -angDl),- 90.) GCOz(XF  ,calc(  -angDl),- 90.))
+    arc D1rtb  D2ltb  (GCOx(XF  ,calc(   angYu),- 90.) GCOy(XF  ,calc(   angYu),- 90.) GCOz(XF  ,calc(   angYu),- 90.))
+    
+    
+    
+    
+    //#D3
+    arc D3ldf  D3ltf  (GCOx(XF  ,calc(      0.), 135.) GCOy(XF  ,calc(      0.), 135.) GCOz(XF  ,calc(      0.), 135.))
+    arc D2ldb  D3ldf  (GCOx(XF  ,calc(  -angDl),-180.) GCOy(XF  ,calc(  -angDl),-180.) GCOz(XF  ,calc(  -angDl),-180.))
+    arc D2ltb  D3ltf  (GCOx(XF  ,calc(   angYu),-180.) GCOy(XF  ,calc(   angYu),-180.) GCOz(XF  ,calc(   angYu),-180.))
+    //#D4                                                                                              
+    arc D3ldf  D1rdf  (GCOx(XF  ,calc(  -angDl),  90.) GCOy(XF  ,calc(  -angDl),  90.) GCOz(XF  ,calc(  -angDl),  90.))
+    arc D3ltf  D1rtf  (GCOx(XF  ,calc(   angYu),  90.) GCOy(XF  ,calc(   angYu),  90.) GCOz(XF  ,calc(   angYu),  90.))
+    //#D5
+       //circle
+    arc D4mtf  D1rtf  (GCOx(XF  ,calc(   angYu), 67.5) GCOy(XF  ,calc(   angYu), 67.5) GCOz(XF  ,calc(   angYu), 67.5))
+    arc D1rtf  D1rtm  (GCOx(XF  ,calc(   angYu), 22.5) GCOy(XF  ,calc(   angYu), 22.5) GCOz(XF  ,calc(   angYu), 22.5))
+    arc D1rtm  D1rtb  (GCOx(XF  ,calc(   angYu),-22.5) GCOy(XF  ,calc(   angYu),-22.5) GCOz(XF  ,calc(   angYu),-22.5))
+    arc D1rtb  D2mtb  (GCOx(XF  ,calc(   angYu),-67.5) GCOy(XF  ,calc(   angYu),-67.5) GCOz(XF  ,calc(   angYu),-67.5))
+    arc D2mtb  D2ltb  (GCOx(XF  ,calc(   angYu),-112.) GCOy(XF  ,calc(   angYu),-112.) GCOz(XF  ,calc(   angYu),-112.))
+    arc D2ltb  D3ltm  (GCOx(XF  ,calc(   angYu),-157.) GCOy(XF  ,calc(   angYu),-157.) GCOz(XF  ,calc(   angYu),-157.))
+    arc D3ltm  D3ltf  (GCOx(XF  ,calc(   angYu), 156.) GCOy(XF  ,calc(   angYu), 156.) GCOz(XF  ,calc(   angYu), 156.))
+    arc D3ltf  D4mtf  (GCOx(XF  ,calc(   angYu), 112.) GCOy(XF  ,calc(   angYu), 112.) GCOz(XF  ,calc(   angYu), 112.))
+       //inner tripod
+    arc D4mtf  D5mtt  (GCOx(XF  ,calc(5.+angYu), 90.0) GCOy(XF  ,calc(5.+angYu), 90.0) GCOz(XF  ,calc(5.+angYu), 90.0))
+    arc D1rtm  D5mtt  (GCOx(XF  ,calc(5.+angYu),  0.0) GCOy(XF  ,calc(5.+angYu),  0.0) GCOz(XF  ,calc(5.+angYu),  0.0))
+    arc D2mtb  D5mtt  (GCOx(XF  ,calc(5.+angYu), 90.0) GCOy(XF  ,calc(5.+angYu), 90.0) GCOz(XF  ,calc(5.+angYu), 90.0))
+    arc D3ltm  D5mtt  (GCOx(XF  ,calc(5.+angYu),180.0) GCOy(XF  ,calc(5.+angYu),180.0) GCOz(XF  ,calc(5.+angYu),180.0))
+);
+ 
+patches
+(
+     patch side      //#D
+     (            
+            (D1rdf D1rdb D1rtb D1rtf) //#D1
+            (D1rdb D2ldb D2ltb D1rtb) //#D2
+            (D2ldb D3ldf D3ltf D2ltb) //#D3
+            (D3ldf D1rdf D1rtf D3ltf) //#D4
+            
+            (D4mtf D1rtf D1rtm D5mtt) //#D5_1
+            (D5mtt D1rtm D1rtb D2mtb) //#D5_2
+            (D3ltm D5mtt D2mtb D2ltb) //#D5_3
+            (D3ltf D4mtf D5mtt D3ltm) //#D5_4
+     )
+//      
+//      patch side      //#C
+//      (            
+//             (C1rdf C1rdb C1rtb C1rtf) //#C1
+//             (C1rdb C2ldb C2ltb C1rtb) //#C2
+//             (C2ldb C3ldf C3ltf C2ltb) //#C3
+//             (C3ldf C1rdf C1rtf C3ltf) //#C4
+//             
+//             (C4mtf C1rtf C1rtm C5mtt) //#C5_1
+//             (C5mtt C1rtm C1rtb C2mtb) //#C5_2
+//             (C3ltm C5mtt C2mtb C2ltb) //#C5_3
+//             (C3ltf C4mtf C5mtt C3ltm) //#C5_4
+//      )
+//      
+//      patch side      //#B
+//      (            
+//             (B1rdf B1rdb B1rtb B1rtf) //#B1
+//             (B1rdb B2ldb B2ltb B1rtb) //#B2
+//             (B2ldb B3ldf B3ltf B2ltb) //#B3
+//             (B3ldf B1rdf B1rtf B3ltf) //#B4
+//             
+//             (B4mtf B1rtf B1rtm B5mtt) //#B5_1
+//             (B5mtt B1rtm B1rtb B2mtb) //#B5_2
+//             (B3ltm B5mtt B2mtb B2ltb) //#B5_3
+//             (B3ltf B4mtf B5mtt B3ltm) //#B5_4
+//      )
+     
+     patch wall
+     (            
+            (A1rdf A1ldf A1ldb A1rdb) //#A1
+            (A1rdf A1rdb B1rdb B1rdf) //#B1
+            (A1rdb A1ldb B2ldb B1rdb) //#B2
+            (A1ldb A1ldf B3ldf B2ldb) //#B3
+            (A1ldf A1rdf B1rdf B3ldf) //#B4
+            (B1rdf C1rdf C1rdb B1rdb) //# C1
+            (B2ldb B1rdb C1rdb C2ldb) //# C2
+            (B3ldf B2ldb C2ldb C3ldf) //# C3
+            (B3ldf C3ldf C1rdf B1rdf) //# C4
+            (C1rdf D1rdf D1rdb C1rdb) //# D1
+            (C2ldb C1rdb D1rdb D2ldb) //# D2
+            (C3ldf C2ldb D2ldb D3ldf) //# D3
+            (C3ldf D3ldf D1rdf C1rdf) //# D4
+     )
+     
+     empty top_1
+     (
+         (A1rtf B1rtf B1rtb A1rtb) //# B1
+         (A1ltb A1rtb B1rtb B2ltb) //# B2
+         (A1ltf A1ltb B2ltb B3ltf) //# B3
+         (A1ltf B3ltf B1rtf A1rtf) //# B4
+         (A1ltf A1rtf A1rtb A1ltb) //# A1
+     )
+     
+     empty B5
+     (
+         //#circle
+         (B4mtb B4mtf B1rtf A1rtf) //#B5_1
+         (A1rtf B1rtf B1rtm B1ltm) //#B5_1
+         (B1ltm B1rtm B1rtb A1rtb) //#B5_2
+         (A1rtb B1rtb B2mtb B2mtf) //#B5_2
+         (B2mtf B2mtb B2ltb A1ltb) //#B5_3
+         (A1ltb B2ltb B3ltm B3rtm) //#B5_3
+         (B3rtm B3ltm B3ltf A1ltf) //#B5_4
+         (A1ltf B3ltf B4mtf B4mtb) //#B5_4
+         //#bottom:
+         (B4mtb A1rtf B1ltm B5mtd) //#B5_1
+         (B5mtd B1ltm A1rtb B2mtf) //#B5_2
+         (B5mtd B2mtf A1ltb B3rtm) //#B5_3
+         (B5mtd B3rtm A1ltf B4mtb) //#B5_4
+     )
+     
+     empty top_2
+     (
+         (B1rtf C1rtf C1rtb B1rtb) //# C1
+         (B1rtb C1rtb C2ltb B2ltb) //# C2
+         (B2ltb C2ltb C3ltf B3ltf) //# C3
+         (B3ltf C3ltf C1rtf B1rtf) //# C4
+     )
+     
+     empty C5
+     (
+         //#circle
+         (B4mtf C4mtf C1rtf B1rtf) //#C5_1_1
+         (B1rtf C1rtf C1rtm B1rtm) //#C5_1_2
+         (B1rtm C1rtm C1rtb B1rtb) //#C5_2_1
+         (B1rtb C1rtb C2mtb B2mtb) //#C5_2_2
+         (B2mtb C2mtb C2ltb B2ltb) //#C5_3_1
+         (B2ltb C2ltb C3ltm B3ltm) //#C5_3_2
+         (B3ltm C3ltm C3ltf B3ltf) //#C5_4_1
+         (B3ltf C3ltf C4mtf B4mtf) //#C5_4_2
+     )
+     
+     empty top_3
+     (
+         (C1rtf D1rtf D1rtb C1rtb) //# D1
+         (C1rtb D1rtb D2ltb C2ltb) //# D2
+         (C2ltb D2ltb D3ltf C3ltf) //# D3
+         (C3ltf D3ltf D1rtf C1rtf) //# D4
+     )
+     
+     empty D5
+     (
+         //#circle
+         (C4mtf D4mtf D1rtf C1rtf) //#D5_1_1
+         (C1rtf D1rtf D1rtm C1rtm) //#D5_1_2
+         (C1rtm D1rtm D1rtb C1rtb) //#D5_2_1
+         (C1rtb D1rtb D2mtb C2mtb) //#D5_2_2
+         (C2mtb D2mtb D2ltb C2ltb) //#D5_3_1
+         (C2ltb D2ltb D3ltm C3ltm) //#D5_3_2
+         (C3ltm D3ltm D3ltf C3ltf) //#D5_4_1
+         (C3ltf D3ltf D4mtf C4mtf) //#D5_4_2
+     )
+     
+);   
+     
+
+mergePatchPairs
+(
+);
