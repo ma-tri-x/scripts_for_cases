@@ -33,13 +33,14 @@ def main():
     #parser.add_argument("-d", "--mesh_dimensions", help="dimensions of the mesh", type=int, choices=[2], required=False, 
                         #default=2)
     parser.add_argument("-t", "--begin_time", help="time to start scanning", type=float, required=True)
+    parser.add_argument("-e", "--end_time", help="time to start scanning", type=float, required=False, 
+                        default=101e-6)
     
     # NOTE: "This script is written for cases which write theta (half opening angle in degrees)
     #        into THETA file in case dir"
     
     args = parser.parse_args()
     fpath = os.path.dirname(os.path.realpath(__file__))
-    
     try:
         with open(os.path.join(fpath,"THETA"),"r") as THETA:
             thet = THETA.readlines()
@@ -64,7 +65,8 @@ def main():
     a = np.loadtxt(dpath)
     times = a.T[0]
     start_index = np.argmin(np.abs(times - args.begin_time))
-    radii = radius(a[start_index:].T[1],theta)
+    end_index = np.argmin(np.abs(times - args.end_time))
+    radii = radius(a[start_index:end_index].T[1],theta)
     calc_time_index = np.argmin(np.abs(radii - args.radius))
         
     print(times[calc_time_index + start_index])

@@ -2,8 +2,8 @@
 
 thisdir=$(pwd)
 
-radii="120e-6  100e-6 80e-6"
-keyIn="80e-6"
+radii="180e-6 160e-6 140e-6 120e-6"
+keyIn="120e-6"
 start_time="80e-6"
 
 echo "NOTE: if somewhere/contour/*.csv are missing"
@@ -38,7 +38,7 @@ do
     rm contour.eps
     pdfcrop contour.pdf contour.pdf
     pdf270 contour.pdf
-    mv contour-rotated270.pdf contour_${ts}_radius.pdf
+    mv contour-rotated270.pdf contour_${radius}_radius.pdf
     rm contour.pdf
     let 'i=i+1'
 done
