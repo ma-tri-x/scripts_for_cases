@@ -1,0 +1,4 @@
+get_alpha2_vol_t0.C
+
+EXE = $(FOAM_APPBIN)/get_alpha2_vol_t0
+
