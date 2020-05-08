@@ -4,50 +4,88 @@ reset
 #set term wxt
 #set output
 
-set term postscript enhanced solid color font "DejaVuSerif, 24pt"
-set output "contour.eps"
-UNCOMMENTFORKEY set key top left
-UNCOMMENTFORNOKEY unset key
+set term pngcairo transparent font "DejaVuSerif, 18pt" size 1000,1000 #postscript enhanced solid color font "DejaVuSerif, 18pt"
+set output "contour.png" #"contour.eps"
+# UNCOMMENTFORKEY set key above #top left
+# UNCOMMENTFORNOKEY unset key
+set key above
 set size ratio -1
 set tics out
-set grid
+set grid lw 3
 set datafile separator ","
 
+
+
 #autofreq start,incr:
-1STNOCOMMENT set ylabel "y [{/Symbol m}m]"
-1STNOCOMMENT set xlabel "x [{/Symbol m}m]"
-1STNOCOMMENT set xtics autofreq 100
-1STNOCOMMENT set ytics autofreq 100
-1STNOCOMMENT set title "same equiv. radius"
+#1STNOCOMMENT set ylabel "y [{/Symbol m}m]"
+#1STNOCOMMENT set xlabel "x [{/Symbol m}m]"
+#1STNOCOMMENT set xtics autofreq 100
+#1STNOCOMMENT set ytics autofreq 100
+set ylabel "y [{/Symbol m}m]"
+set xlabel "x [{/Symbol m}m]"
+set xtics autofreq 100
+set ytics autofreq 100
 
-1STCOMMENT set xtics autofreq 100,100 
-1STCOMMENT unset ylabel
-1STCOMMENT unset xlabel
-1STCOMMENT set format y ""
+#1STCOMMENT set xtics autofreq 0,100 
+#1STCOMMENT unset ylabel
+#1STCOMMENT unset xlabel
+#1STCOMMENT set format y ""
 
-set xrange [0:250]
+set xrange [-250:250]
 set yrange [-400:100]
 
-dir1 = "../0071_dstar1.6_from_sose2019_boxBubble_2mum/"
-time_theory_1 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f",dir1,radius,start_time))
+dir1 = "../0071_dstar1.6_from_sose2019_boxBubble_4mum/"
+time_theory_1 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f -e 99e-6",dir1,radius,start_time))
 time_1 = system(sprintf("python %sget_closest_timestep.py -p processor0 -t %s",dir1,time_theory_1))
 time_idx_1 = system(sprintf("python %sget_index_of_time.py %s",dir1,time_1))
-file1=sprintf("bla0.%s.csv",time_idx_1)
+file1=sprintf("bla0.%d.csv",time_idx_1 +8)
 
-dir2 = "../0071_dstar1.6_from_sose2019_boxBubble_1.5mum/"
+dir2 = "../0071_dstar1.6_from_sose2019_boxBubble_3mum/"
 time_theory_2 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f",dir2,radius,start_time))
 time_2 = system(sprintf("python %sget_closest_timestep.py -p processor0 -t %s",dir2,time_theory_2))
 time_idx_2 = system(sprintf("python %sget_index_of_time.py %s",dir2,time_2))
-file2=sprintf("bla0.%s.csv",time_idx_2)
+file2=sprintf("bla0.%d.csv",time_idx_2 +7)
 
-dir3 = "../0071_dstar1.6_from_sose2019_boxBubble/"
+dir3 = "../0071_dstar1.6_from_sose2019_boxBubble_2.5mum/"
 time_theory_3 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f",dir3,radius,start_time))
 time_3 = system(sprintf("python %sget_closest_timestep.py -p processor0 -t %s",dir3,time_theory_3))
 time_idx_3 = system(sprintf("python %sget_index_of_time.py %s",dir3,time_3))
-file3=sprintf("bla0.%s.csv",time_idx_3)
+file3=sprintf("bla0.%d.csv",time_idx_3 +5)
+
+dir4 = "../0071_dstar1.6_from_sose2019_boxBubble_2mum/"
+time_theory_4 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f",dir4,radius,start_time))
+time_4 = system(sprintf("python %sget_closest_timestep.py -p processor0 -t %s",dir4,time_theory_4))
+time_idx_4 = system(sprintf("python %sget_index_of_time.py %s",dir4,time_4))
+file4=sprintf("bla0.%d.csv",time_idx_4+3)
+
+dir5 = "../0071_dstar1.6_from_sose2019_boxBubble_1.5mum/"
+time_theory_5 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f",dir5,radius,start_time))
+time_5 = system(sprintf("python %sget_closest_timestep.py -p processor0 -t %s",dir5,time_theory_5))
+time_idx_5 = system(sprintf("python %sget_index_of_time.py %s",dir5,time_5))
+file5=sprintf("bla0.%s.csv",time_idx_5)
+
+dir6 = "../0071_dstar1.6_from_sose2019_boxBubble/"
+time_theory_6 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f",dir6,radius,start_time))
+time_6 = system(sprintf("python %sget_closest_timestep.py -p processor0 -t %s",dir3,time_theory_6))
+time_idx_6 = system(sprintf("python %sget_index_of_time.py %s",dir6,time_6))
+file6=sprintf("bla0.%s.csv",time_idx_6)
+#print(time_theory_6)
+#print(time_6)
+#print(time_idx_6)
+
+dir7 = "../0071_dstar1.6_from_sose2019_boxBubble_0.75mum/"
+time_theory_7 = system(sprintf("python %sget_time_of_radius.py -r %f -t %f",dir7,radius,start_time))
+time_7 = system(sprintf("python %sget_closest_timestep.py -p processor0 -t %s",dir7,time_theory_7))
+time_idx_7 = system(sprintf("python %sget_index_of_time.py %s",dir7,time_7))
+file7=sprintf("bla0.%s.csv",time_idx_7)
 
 plot \
-dir1."contour/".file1 u (($2)*1e6):(($3)*1e6) w l lw 1 lc 1 dt 1 t "2{/Symbol m}m",\
-dir2."contour/".file2 u (($2)*1e6):(($3)*1e6) w l lw 1 lc 2 dt 1 t "1.5{/Symbol m}m",\
-dir3."contour/".file3 u (($2)*1e6):(($3)*1e6) w l lw 2 lc 3 dt 1 t "1{/Symbol m}m"
+dir7."contour/".file7 u ( ($2)*1e6):(($3)*1e6) w l lw 7 lc 7 dt 1 t "0.75{/Symbol m}m",\
+dir7."contour/".file7 u (-($2)*1e6):(($3)*1e6) w l lw 7 lc 7 dt 1 notitle ,\
+dir1."contour/".file1 u ( ($2)*1e6):(($3)*1e6) w l lw 3 lc 1 dt 1 t "4{/Symbol m}m",\
+dir2."contour/".file2 u ( ($2)*1e6):(($3)*1e6) w l lw 3 lc 2 dt 1 t "3{/Symbol m}m",\
+dir3."contour/".file3 u ( ($2)*1e6):(($3)*1e6) w l lw 3 lc 3 dt 1 t "2.5{/Symbol m}m",\
+dir4."contour/".file4 u (-($2)*1e6):(($3)*1e6) w l lw 3 lc 4 dt 1 t "2{/Symbol m}m",\
+dir5."contour/".file5 u (-($2)*1e6):(($3)*1e6) w l lw 3 lc 6 dt 1 t "1.5{/Symbol m}m",\
+dir6."contour/".file6 u (-($2)*1e6):(($3)*1e6) w l lw 4 lc 8 dt 2 t "1{/Symbol m}m"
 
