@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ ! $# == 1 ];then
+    echo "usage: $0 <scriptname.py>"
+    exit 1
+fi
+
+cp /usr/bin/script_example_python.py $(pwd)/$1
