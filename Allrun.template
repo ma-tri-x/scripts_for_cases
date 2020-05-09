@@ -32,8 +32,7 @@ copy_0backup ()
 #  cp 0/backup/rho_gTilde.org 0/rho2Tilde
 #  cp 0/backup/rho_gSource.org 0/rho_gSource
  cp 0/backup/U 0/U
- cp 0/backup/alpha1.org 0/passiveScalar
- sed -i "#alpha1#passiveScalar#" 0/passiveScalar  
+ cp 0/backup/passiveScalar 0/passiveScalar
 }
 
 ### get solver commit version number: #####
@@ -183,6 +182,7 @@ echo "Q                = $Q       "
 echo "pBubble          = $pBubble "
 echo "Pm               = $Pm      "
 echo $nCells
+echo "cells now: $(checkMesh | grep "cells:" | sed "s/\s//g" | sed "s/cells://g")"
 
 time=_CONTROLDICT-STARTTIME
 
@@ -361,8 +361,8 @@ if [ $parallel ];then
 fi
 
     
-date
 if [ "_RUN_CALC_IN_ALLRUN" == "true" ];then
+a=$(date)
     if [ "_DECOMPOSE-DECOMPOSE" = "true" ];then
         echo "-- running in parallel --"
 	echo "output of which command: $(which _SOLVERCONTROLS-SOLVER)"
@@ -373,11 +373,14 @@ if [ "_RUN_CALC_IN_ALLRUN" == "true" ];then
         _SOLVERCONTROLS-SOLVER > run.log #/dev/null 2>&1 #> run.log
     fi
     python copy_solver_here.py
+b=$(date)
+echo "automatic case running took from $a to $b"
 fi
-date
 
  massFile=postProcessing/volumeIntegrate_volumeIntegral/0/rhoBubble
- cp $massFile ${massFile}ForParaView
- sed -i "s/#//g" ${massFile}ForParaView
+ if [ -e $massFile ];then 
+    cp $massFile ${massFile}ForParaView
+    sed -i "s/#//g" ${massFile}ForParaView
+ fi
 
 # ----------------------------------------------------------------- end-of-file

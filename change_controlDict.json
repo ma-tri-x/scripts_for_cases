@@ -1,0 +1,18 @@
+{"0.0" : {
+        "startFrom": "latestTime"
+    },
+ "120e-6" :
+    {
+        "stayBelowAcousticCo": 30, 
+        "writeControl": "adjustableRunTime", 
+        "critAcousticCo": 0.01, 
+        "writeInterval": 5e-6
+    },
+ "200e-6" :
+    {
+        "stayBelowAcousticCo": 50, 
+        "writeControl": "adjustableRunTime", 
+        "critAcousticCo": 0.01, 
+        "writeInterval": 1e-05
+    }
+}

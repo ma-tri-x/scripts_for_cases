@@ -2,6 +2,7 @@
 
 import os, sys, argparse, glob, time, json, subprocess
 import numpy as np
+from datetime import datetime as dt
 
 def tail(f, lines=1, _buffer=4098):
     """Tail a file and get X lines from the end"""
@@ -30,8 +31,11 @@ def tail(f, lines=1, _buffer=4098):
     return lines_found[-lines:]
 
 def get_current_runtime():
-    with open("run.log","r") as f:
-        lines = tail(f, 100)
+    try:
+        with open("run.log","r") as f:
+            lines = tail(f, 100)
+    except(IOError):
+        return
     takentime = 0.
     for line in lines:
         if "Taken" in line:
@@ -66,16 +70,41 @@ def main():
                     }
                 }
             json.dump(d,f)
-        with open(dict_file,'r') as f:
-            change_dict = json.load(f)
     
+    trial=0
+    maxtrials=3
     while True:
-        for time_switch in change_dict:
+        try:
+            with open(dict_file,'r') as f:
+                change_dict = json.load(f)
+            
+            now = (dt.now()).strftime("%Y-%m-%d %H:%M:%S")
+            
+            if os.path.isfile(os.path.join(this_path,"stop_deamon")):
+                print("{} stopping deamon in {}".format(now,this_path))
+                print("rm {}".format(os.path.join(this_path,"stop_deamon")))
+                os.system("rm {}".format(os.path.join(this_path,"stop_deamon")))
+                exit(0)
+                
             curr_time = get_current_runtime()
-            if curr_time > float(time_switch): 
-                change_controlDict(change_dict[time_switch])
-                print("controlDict changed to {}".format(change_dict[time_switch]))
-        time.sleep(args.interval)
+            
+            if curr_time:
+                for time_switch in change_dict:
+                    if curr_time > float(time_switch): 
+                        change_controlDict(change_dict[time_switch])
+                        print("{} controlDict changed to {}".format(now, change_dict[time_switch]))
+            else:
+                if trial >= maxtrials:
+                    print("{} no run.log. Stopping deamon in {}".format(now,this_path))
+                    exit(1)
+                print("{} waiting for run.log".format(now))
+                trial += 1
+            
+            time.sleep(args.interval)
+        
+        except(KeyboardInterrupt):
+            print("{} stopping deamon in {}".format(now,this_path))
+            exit(0)
     
 
 if __name__=="__main__":
