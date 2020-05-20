@@ -1,0 +1,383 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * *2020-02-17 * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * easier to read because of N,S,W,E notation! * * * * * * * * * * * //
+// * * * * * * * * and GCO instead of GCOx GCOy GCOz!* * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'use Math::Trig; use Math::Round; printf ($1)')])
+define(get_cell_amount, [esyscmd(python calc_n_by_grading.py $1 $2 $3)])
+define(PI, 3.14159265358979323846264338327950288)
+
+//# Origin for GCOi functions:
+define(Ox, 0.)
+define(Oy, 0.)
+define(Oz, 0.)
+//# define function to get circle point coordinates when having origin in (0 0 0)
+//# GCP = getCirclePoint
+//# GCPx = R * cos(phi [deg]) * cos(theta [rad]
+define(GCOx, [calc(($1)*cos( ($2)/180.*PI ) *cos(($3)/180.*PI) + Ox)])
+define(GCOy, [calc(($1)*sin( ($2)/180.*PI ) + Oy)])
+define(GCOz, [calc(($1)*cos( ($2)/180.*PI ) *sin(($3)/180.*PI) + Oz)])
+define(GCO, [GCOx($1,$2,$3) GCOy($1,$2,$3) GCOz($1,$2,$3)])
+
+
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+
+//# parameters that drive the mesh:
+define(wd, _BUBBLE-D_INIT)              // distance of bubble center to rigid wall (only for comparison)
+define(Rmax, _BUBBLE-RMAX)
+define(X, calc(_MESH-FACTORBUBBLEDOMAINRMAX * Rmax))                     // bubble domain im (domain B)
+define(XF,calc(_MESH-DOMAINSIZEFACTORRMAX * Rmax))              // mesh end (domain C)
+define(XF_grading_factor,_MESH-GRADINGFACTOR)              // mesh end (domain C)
+define(cellsize, _MESH-CELLSIZE)      // angular number of cells in B domain
+define(Rstart, _BUBBLE-RSTART)
+define(cartLen, _MESH-MESHCORESIZE)  // edge length of inner cartesian core bottom side. Must be > 2*Rstart
+define(cartHgt, cartLen) // height of inner kartesian core
+define(A1x, calc(cartLen/2.))
+
+//################### inner cartesian core with half diagonal of bottom plate: Xi
+define(numXZ, calc(round(cartLen/cellsize/2.)))
+define(numY,  calc(round(cartHgt/cellsize)))
+define(angle, calc(atan(cartHgt/A1x)/PI*180.)) //calc(45./PI*180.))
+
+//################### domain B
+define(cw_A, cellsize)
+//# length of domain C
+define(l_B, calc(X-A1x))
+//# grading of C domain
+define(Bgrd,calc(X/A1x)) 
+//# computing radial number of cells
+define(logarg, calc((cw_A/l_B-1.)/(cw_A/l_B*Bgrd - 1.)))
+define(_Bnum, calc(1+log(Bgrd)/log(logarg)  ))
+define(Bnum, calc(round(_Bnum)))
+//# cell width at x=X
+define(cw_X, calc(cw_A*Bgrd))
+
+//################### domain C
+//# length of domain D
+define(l_C, calc(XF-X))
+//# grading of C domain
+define(Cgrd,calc(XF_grading_factor*XF/X)) 
+//# computing radial number of cells
+//#define(logarg, calc((cw_X -l_D)/(cw_X*Dgrd - l_D)))
+//#define(_Dnum, calc(1+log(Dgrd)/log(logarg)  ))
+//#define(Dnum, calc(round(_Dnum)))
+define(Cnum, get_cell_amount(Cgrd,l_C,cw_X))
+define(cw_XF, calc(cw_X*Cgrd))
+
+//# l=left,r=right,f=front,b=back,t=top,d=down; Teildomänen durchnummeriert von oben nach unten
+//# Reihenfolge: domain-nummer-left/right-top/down-front/back
+vertices
+(
+    //#A1
+    (0 0 0)                vlabel(orig)
+    (0 cartHgt 0)          vlabel(AZ)
+    
+    ( A1x 0    0)          vlabel(AEd)
+    ( A1x 0 -A1x)          vlabel(ANEd)
+    (   0 0 -A1x)          vlabel(ANd)
+    (-A1x 0 -A1x)          vlabel(ANWd)
+    (-A1x 0    0)          vlabel(AWd)
+    (-A1x 0  A1x)          vlabel(ASWd)
+    (   0 0  A1x)          vlabel(ASd)
+    ( A1x 0  A1x)          vlabel(ASEd)
+                          
+    ( A1x cartHgt  0)      vlabel(AEt)
+    ( A1x cartHgt -A1x)    vlabel(ANEt)
+    (   0 cartHgt -A1x)    vlabel(ANt)
+    (-A1x cartHgt -A1x)    vlabel(ANWt)
+    (-A1x cartHgt  0)      vlabel(AWt)
+    (-A1x cartHgt  A1x)    vlabel(ASWt)
+    (   0 cartHgt  A1x)    vlabel(ASt)
+    ( A1x cartHgt  A1x)    vlabel(ASEt)
+    
+    //#B
+    (GCO(X,    0.,    0.))      vlabel(BEd)
+    (GCO(X,    0.,  -45.))      vlabel(BNEd)
+    (GCO(X,    0.,  -90.))      vlabel(BNd)
+    (GCO(X,    0., -135.))      vlabel(BNWd)
+    (GCO(X,    0.,  180.))      vlabel(BWd)
+    (GCO(X,    0.,  135.))      vlabel(BSWd)
+    (GCO(X,    0.,   90.))      vlabel(BSd)
+    (GCO(X,    0.,   45.))      vlabel(BSEd)
+    
+    (GCO(X, angle,    0.))      vlabel(BEt)
+    (GCO(X, angle,  -45.))      vlabel(BNEt)
+    (GCO(X, angle,  -90.))      vlabel(BNt)
+    (GCO(X, angle, -135.))      vlabel(BNWt)
+    (GCO(X, angle,  180.))      vlabel(BWt)
+    (GCO(X, angle,  135.))      vlabel(BSWt)
+    (GCO(X, angle,   90.))      vlabel(BSt)
+    (GCO(X, angle,   45.))      vlabel(BSEt)
+    
+    (0 X 0)                     vlabel(BZ)
+    
+    //#C
+    (GCO(XF,    0.,    0.))      vlabel(CEd)
+    (GCO(XF,    0.,  -45.))      vlabel(CNEd)
+    (GCO(XF,    0.,  -90.))      vlabel(CNd)
+    (GCO(XF,    0., -135.))      vlabel(CNWd)
+    (GCO(XF,    0.,  180.))      vlabel(CWd)
+    (GCO(XF,    0.,  135.))      vlabel(CSWd)
+    (GCO(XF,    0.,   90.))      vlabel(CSd)
+    (GCO(XF,    0.,   45.))      vlabel(CSEd)
+    
+    (GCO(XF, angle,    0.))      vlabel(CEt)
+    (GCO(XF, angle,  -45.))      vlabel(CNEt)
+    (GCO(XF, angle,  -90.))      vlabel(CNt)
+    (GCO(XF, angle, -135.))      vlabel(CNWt)
+    (GCO(XF, angle,  180.))      vlabel(CWt)
+    (GCO(XF, angle,  135.))      vlabel(CSWt)
+    (GCO(XF, angle,   90.))      vlabel(CSt)
+    (GCO(XF, angle,   45.))      vlabel(CSEt)
+    
+    (0 XF 0)                     vlabel(CZ)
+    
+);
+ 
+blocks
+(
+  hex (orig AEd ANEd ANd  AZ AEt ANEt ANt)   (numXZ numXZ numY) simpleGrading (1 1 1) //# ANE
+  hex (orig ANd ANWd AWd  AZ ANt ANWt AWt)   (numXZ numXZ numY) simpleGrading (1 1 1) //# ANW
+  hex (orig AWd ASWd ASd  AZ AWt ASWt ASt)   (numXZ numXZ numY) simpleGrading (1 1 1) //# ASW
+  hex (orig ASd ASEd AEd  AZ ASt ASEt AEt)   (numXZ numXZ numY) simpleGrading (1 1 1) //# ASE
+  
+  hex (AEd ANEd ANEt AEt  BEd BNEd BNEt BEt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //# BNE1
+  hex (ANEd ANd ANt ANEt  BNEd BNd BNt BNEt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //# BNE2
+  hex (ANt AZ AEt ANEt    BNt BZ BEt BNEt  ) (numXZ numXZ Bnum) simpleGrading (1 1 Bgrd) //# BNEZ
+  
+  hex (ANd ANWd ANWt ANt  BNd BNWd BNWt BNt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //#BNW1
+  hex (ANWd AWd AWt ANWt  BNWd BWd BWt BNWt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //#BNW2
+  hex (ANWt AWt AZ ANt    BNWt BWt BZ BNt  ) (numXZ numXZ Bnum) simpleGrading (1 1 Bgrd) //#BNWZ
+  
+  hex (AWd ASWd ASWt AWt  BWd BSWd BSWt BWt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //#BSW1
+  hex (ASWd ASd ASt ASWt  BSWd BSd BSt BSWt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //#BSW2
+  hex (AWt ASWt ASt AZ    BWt BSWt BSt BZ  ) (numXZ numXZ Bnum) simpleGrading (1 1 Bgrd) //#BSWZ
+  
+  hex (ASd ASEd ASEt ASt  BSd BSEd BSEt BSt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //#BSE1
+  hex (ASEd AEd AEt ASEt  BSEd BEd BEt BSEt) (numXZ numY  Bnum) simpleGrading (1 1 Bgrd) //#BSE2
+  hex (ASEt AEt AZ ASt    BSEt BEt BZ BSt  ) (numXZ numXZ Bnum) simpleGrading (1 1 Bgrd) //#BSEZ
+  
+  
+  hex (BEd BNEd BNEt BEt  CEd CNEd CNEt CEt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //# CNE1
+  hex (BNEd BNd BNt BNEt  CNEd CNd CNt CNEt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //# CNE2
+  hex (BNt BZ BEt BNEt    CNt CZ CEt CNEt  ) (numXZ numXZ Cnum) simpleGrading (1 1 Cgrd) //# CNEZ
+  
+  hex (BNd BNWd BNWt BNt  CNd CNWd CNWt CNt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //#CNW1
+  hex (BNWd BWd BWt BNWt  CNWd CWd CWt CNWt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //#CNW2
+  hex (BNWt BWt BZ BNt    CNWt CWt CZ CNt  ) (numXZ numXZ Cnum) simpleGrading (1 1 Cgrd) //#CNWZ
+  
+  hex (BWd BSWd BSWt BWt  CWd CSWd CSWt CWt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //#CSW1
+  hex (BSWd BSd BSt BSWt  CSWd CSd CSt CSWt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //#CSW2
+  hex (BWt BSWt BSt BZ    CWt CSWt CSt CZ  ) (numXZ numXZ Cnum) simpleGrading (1 1 Cgrd) //#CSWZ
+  
+  hex (BSd BSEd BSEt BSt  CSd CSEd CSEt CSt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //#CSE1
+  hex (BSEd BEd BEt BSEt  CSEd CEd CEt CSEt) (numXZ numY  Cnum) simpleGrading (1 1 Cgrd) //#CSE2
+  hex (BSEt BEt BZ BSt    CSEt CEt CZ CSt  ) (numXZ numXZ Cnum) simpleGrading (1 1 Cgrd) //#CSEZ
+);
+
+  
+define(angT, calc(angle+(90.-angle)/2.))
+edges                  
+(
+    arc BEd  BEt   (GCO(X ,calc(angle/2.),    0.))   //#BNE1-vert1
+    arc BNEd BNEt  (GCO(X ,calc(angle/2.),  -45.))   //#BNE1-vert2
+    arc BEd  BNEd  (GCO(X ,            0., -22.5))   //#BNE1-horz1
+    arc BEt  BNEt  (GCO(X ,         angle, -22.5))   //#BNE1-horz2
+    
+    arc BNEd BNd   (GCO(X ,            0., -67.5))   //#BNE2-horz1
+    arc BNEt BNt   (GCO(X ,         angle, -67.5))   //#BNE2-horz2
+    arc BNd  BNt   (GCO(X ,calc(angle/2.),  -90.))   //#BNE2-vert2
+    
+    arc BEt  BZ    (GCO(X ,          angT,   0.0))   //#BNEZ-vert1
+    arc BNt  BZ    (GCO(X ,          angT, -90.0))   //#BNEZ-vert2
+    
+    
+    arc BNWd BNWt  (GCO(X ,calc(angle/2.),-135.0))   //#BNW1-vert2
+    arc BNd  BNWd  (GCO(X ,            0.,-112.5))   //#BNW1-horz1
+    arc BNt  BNWt  (GCO(X ,         angle,-112.5))   //#BNW1-horz2
+    
+    arc BNWd BWd   (GCO(X ,            0.,-157.5))   //#BNW2-horz1
+    arc BNWt BWt   (GCO(X ,         angle,-157.5))   //#BNW2-horz2
+    arc BWd  BWt   (GCO(X ,calc(angle/2.), 180.0))   //#BNW2-vert2
+    
+    arc BWt  BZ    (GCO(X ,          angT, 180.0))   //#BNWZ-vert2
+    
+        
+    arc BSWd BSWt  (GCO(X ,calc(angle/2.), 135.0))   //#BSW1-vert2
+    arc BWd  BSWd  (GCO(X ,            0., 157.5))   //#BSW1-horz1
+    arc BWt  BSWt  (GCO(X ,         angle, 157.5))   //#BSW1-horz2
+    
+    arc BSWd BSd   (GCO(X ,            0., 112.5))   //#BSW2-horz1
+    arc BSWt BSt   (GCO(X ,         angle, 112.5))   //#BSW2-horz2
+    arc BSd  BSt   (GCO(X ,calc(angle/2.),  90.0))   //#BSW2-vert2
+    
+    arc BSt  BZ    (GCO(X ,          angT,  90.0))   //#BSWZ-vert2
+        
+        
+    arc BSEd BSEt  (GCO(X ,calc(angle/2.),  45.0))   //#BSE1-vert2
+    arc BSd  BSEd  (GCO(X ,            0.,  67.5))   //#BSE1-horz1
+    arc BSt  BSEt  (GCO(X ,         angle,  67.5))   //#BSE1-horz2
+    
+    arc BSEd BEd   (GCO(X ,            0.,  22.5))   //#BSE2-horz1
+    arc BSEt BEt   (GCO(X ,         angle,  22.5))   //#BSE2-horz2
+    
+    
+    
+    
+    arc CEd  CEt   (GCO(XF,calc(angle/2.),    0.))   //#CNE1-vert1
+    arc CNEd CNEt  (GCO(XF,calc(angle/2.),  -45.))   //#CNE1-vert2
+    arc CEd  CNEd  (GCO(XF,            0., -22.5))   //#CNE1-horz1
+    arc CEt  CNEt  (GCO(XF,         angle, -22.5))   //#CNE1-horz2
+    
+    arc CNEd CNd   (GCO(XF,            0., -67.5))   //#CNE2-horz1
+    arc CNEt CNt   (GCO(XF,         angle, -67.5))   //#CNE2-horz2
+    arc CNd  CNt   (GCO(XF,calc(angle/2.),  -90.))   //#CNE2-vert2
+    
+    arc CEt  CZ    (GCO(XF,          angT,   0.0))   //#CNEZ-vert1
+    arc CNt  CZ    (GCO(XF,          angT, -90.0))   //#CNEZ-vert2
+    
+    
+    arc CNWd CNWt  (GCO(XF,calc(angle/2.),-135.0))   //#CNW1-vert2
+    arc CNd  CNWd  (GCO(XF,            0.,-112.5))   //#CNW1-horz1
+    arc CNt  CNWt  (GCO(XF,         angle,-112.5))   //#CNW1-horz2
+    
+    arc CNWd CWd   (GCO(XF,            0.,-157.5))   //#CNW2-horz1
+    arc CNWt CWt   (GCO(XF,         angle,-157.5))   //#CNW2-horz2
+    arc CWd  CWt   (GCO(XF,calc(angle/2.), 180.0))   //#CNW2-vert2
+    
+    arc CWt  CZ    (GCO(XF,          angT, 180.0))   //#CNWZ-vert2
+    
+        
+    arc CSWd CSWt  (GCO(XF,calc(angle/2.), 135.0))   //#CSW1-vert2
+    arc CWd  CSWd  (GCO(XF,            0., 157.5))   //#CSW1-horz1
+    arc CWt  CSWt  (GCO(XF,         angle, 157.5))   //#CSW1-horz2
+    
+    arc CSWd CSd   (GCO(XF,            0., 112.5))   //#CSW2-horz1
+    arc CSWt CSt   (GCO(XF,         angle, 112.5))   //#CSW2-horz2
+    arc CSd  CSt   (GCO(XF,calc(angle/2.),  90.0))   //#CSW2-vert2
+    
+    arc CSt  CZ    (GCO(XF,          angT,  90.0))   //#CSWZ-vert2
+        
+        
+    arc CSEd CSEt  (GCO(XF,calc(angle/2.),  45.0))   //#CSE1-vert2
+    arc CSd  CSEd  (GCO(XF,            0.,  67.5))   //#CSE1-horz1
+    arc CSt  CSEt  (GCO(XF,         angle,  67.5))   //#CSE1-horz2
+    
+    arc CSEd CEd   (GCO(XF,            0.,  22.5))   //#CSE2-horz1
+    arc CSEt CEt   (GCO(XF,         angle,  22.5))   //#CSE2-horz2
+);
+
+patches
+(
+     patch wall
+     (            
+//             (AEd ANEd ANEt AEt) //#ANE-E
+//             (ANEd ANd ANt ANEt) //#ANE-N
+//             (AZ  AEt ANEt ANt) //#ANE-northpole
+            
+//             (ANd ANWd ANWt ANt) //#ANW-N
+//             (ANWd AWd AWt ANWt) //#ANW-W
+//             (ANWt AWt   AZ ANt) //#ANW-northpole
+//             
+//             (AWd ASWd ASWt AWt) //#ASW-W
+//             (ASWd ASd ASt ASWt) //#ASW-S
+//             (ASWt ASt   AZ AWt) //#ASW-northpole
+//             
+//             (ASd ASEd ASEt ASt) //#ASE-S
+//             (ASEd AEd AEt ASEt) //#ASE-E
+//             (ASEt AEt   AZ ASt) //#ASE-northpole
+
+            (orig  AEd ANEd ANd) //#ANE-southpole
+            (ANWd AWd orig ANd) //#ANW-southpole
+            (ASWd ASd orig AWd) //#ASW-southpole
+            (ASEd AEd orig ASd) //#ASE-southpole
+            
+            
+            (AEd BEd BNEd ANEd) //#BNE1-southpole
+            (ANEd BNEd BNd ANd) //#BNE2-southpole
+            (ANd BNd BNWd ANWd) //#BNW1-southpole
+            (ANWd BNWd BWd AWd) //#BNW2-southpole
+            (AWd BWd BSWd ASWd) //#BSW1-southpole
+            (ASWd BSWd BSd ASd) //#BSW2-southpole
+            (ASd BSd BSEd ASEd) //#BSE1-southpole
+            (ASEd BSEd BEd AEd) //#BSE2-southpole
+            
+            (BEd CEd CNEd BNEd) //#CNE1-southpole
+            (BNEd CNEd CNd BNd) //#CNE2-southpole
+            (BNd CNd CNWd BNWd) //#CNW1-southpole
+            (BNWd CNWd CWd BWd) //#CNW2-southpole
+            (BWd CWd CSWd BSWd) //#CSW1-southpole
+            (BSWd CSWd CSd BSd) //#CSW2-southpole
+            (BSd CSd CSEd BSEd) //#CSE1-southpole
+            (BSEd CSEd CEd BEd) //#CSE2-southpole
+            
+     )
+     
+     patch side
+     (
+            (CEd CNEd CNEt CEt) //#CNE1-E
+            (CNEd CNd CNt CNEt) //#CNE2-N
+            (CNd CNWd CNWt CNt) //#CNW1-N
+            (CNWd CWd CWt CNWt) //#CNW2-W
+            (CWd CSWd CSWt CWt) //#CSW1-W
+            (CSWd CSd CSt CSWt) //#CSW2-S
+            (CSd CSEd CSEt CSt) //#CSE1-S
+            (CSEd CEd CEt CSEt) //#CSE2-E
+            
+            (CZ CEt CNEt CNt) //#CNEZ
+            (CZ CNt CNWt CWt) //#CNWZ
+            (CZ CWt CSWt CSt) //#CSWZ
+            (CZ CSt CSEt CEt) //#CSEZ
+     )
+);   
+     
+
+mergePatchPairs
+(
+);
