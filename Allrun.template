@@ -75,9 +75,9 @@ fi
 if [ "_MESH-REFINEMESH" = "true" ]
 then
     echo "prepare refining mesh..."
-    n0=_MESH-STARTCELLAMOUNT
-    csgoal=_MESH-CELLSIZEGOAL
-    size=_MESH-SIZE
+    #n0=_MESH-STARTCELLAMOUNT
+    #csgoal=_MESH-CELLSIZEGOAL
+    #size=_MESH-SIZE
     iterations=_REFINE-REFINETIMES #$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0**(1./3.))/$csgoal)/log(2.)) )')")
     iterations=`expr $iterations + 1`
     if [ $iterations -gt 13 ]
@@ -237,13 +237,9 @@ then
     then
         offset=$(m4 <<< "esyscmd(perl -e 'printf ( $R + 1e-6 )')")
     fi 
-    if [ "_MESH-MESHFILE" = "blockMeshDict_axisymm_coreCart_reg_unbound.m4" ]
+    if [ $(python check_str_in_str.py "blockMeshDict_axisymm_coreCart_reg_unbound" "_MESH-MESHFILE") ]
     then
-        offset=$(m4 <<< "esyscmd(perl -e 'printf ( $R + 1e-6 )')")
-        if [ "_FUNKYSETFIELDS-CYLINDERPLASMA" = "true" ]
-        then
-            offset=0.0
-        fi
+        offset=0.0
     fi 
     dist=$offset
 
