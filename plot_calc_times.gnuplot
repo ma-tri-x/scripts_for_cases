@@ -2,7 +2,7 @@
 
 reset
 set term postscript eps color enhance solid font "DejaVuSerif, 18"
-set output "calc_times_box.eps"
+set output "calc_times.eps"
 
 set grid
 
