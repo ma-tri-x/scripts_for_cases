@@ -34,7 +34,7 @@ def main():
                         #default=2)
     parser.add_argument("-t", "--begin_time", help="time to start scanning", type=float, required=True)
     parser.add_argument("-e", "--end_time", help="time to start scanning", type=float, required=False, 
-                        default=101e-6)
+                        default=1e-3)
     
     # NOTE: "This script is written for cases which write theta (half opening angle in degrees)
     #        into THETA file in case dir"
