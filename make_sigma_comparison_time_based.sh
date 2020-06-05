@@ -39,12 +39,22 @@ run_gnuplot () {
     gnuplot plot_sigma_comparison.gnuplot
     epstopdf sigma_comparison.eps
     mv sigma_comparison.pdf ${output%.pdf}${suffix}.pdf
+    pdfcrop ${output%.pdf}${suffix}.pdf ${output%.pdf}${suffix}.pdf
 }
 
 comment_contour_files_first_line () {
     for csvfile in contour/bla*csv;do
         sed -i "s/^\"arc/#\"arc/g"  $csvfile
     done
+}
+
+write_times_to_tex_files () {
+    timesexp=$(echo "$1" | sed "s/e-6/, /g")
+    timesexp=${timesexp%, }"\\mus"
+    timescoll=$(echo "$2" | sed "s/e-6/, /g")
+    timescoll=${timescoll%, }"\\mus"
+    Rn=$3
+    echo "\$t=${timesexp}\$\\timegap\$t=${timescoll}\$" > temp/times_Rn${Rn}.tex
 }
 
 thisdir=$(pwd)
@@ -80,18 +90,22 @@ for i in $study_cases;do
     cd $thisdir
     cp plot_sigma_comparison.gnuplot.backup plot_sigma_comparison.gnuplot
     
+    timesexp=""
     timescoll=""
     output=""
-    if [ $k == 1 ];then timescoll="65e-6 82e-6 88e-6 90e-6";      output="sigma_comparison_Rn184.pdf";fi
-    if [ $k == 2 ];then timescoll="88e-6 96.2e-6 98.8e-6 99.5e-6";output="sigma_comparison_Rn201.pdf";fi
-    if [ $k == 3 ];then timescoll="105e-6 115e-6 118e-6 120.2e-6";output="sigma_comparison_Rn240.pdf";fi
+    if [ $k == 1 ];then timesexp="1e-6 4.5e-6 25e-6"  ;output="sigma_comparison_Rn184.pdf";fi
+    if [ $k == 2 ];then timesexp="1e-6 4.5e-6 20e-6"  ;output="sigma_comparison_Rn201.pdf";fi
+    if [ $k == 3 ];then timesexp="0.5e-6 3e-6 14.5e-6";output="sigma_comparison_Rn240.pdf";fi
+    if [ $k == 1 ];then timescoll="65e-6 82e-6 88e-6 90e-6";      Rn=184;fi
+    if [ $k == 2 ];then timescoll="88e-6 96.2e-6 98.8e-6 99.5e-6";Rn=201;fi
+    if [ $k == 3 ];then timescoll="105e-6 115e-6 118e-6 120.2e-6";Rn=240;fi
     
     #expansion
-    for j in 80e-6 200e-6 400e-6;do
+    for j in $timesexp;do
         cd $i
-        id=$(index_of_radius $j 0.0 45e-6)
+        id=$(index_of_time $j)
         cd ${i}_sigma
-        ids=$(index_of_radius $j 0.0 45e-6)
+        ids=$(index_of_time $j)
         cd $thisdir
         write_lines_to_gnuplot $i $id $ids
     done
@@ -114,4 +128,7 @@ for i in $study_cases;do
     cd $thisdir
     end_gnuplot_file
     run_gnuplot $output "collapse"
+    
+    #Abschluss
+    write_times_to_tex_files "$timesexp" "$timescoll" $Rn
 done

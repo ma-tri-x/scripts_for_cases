@@ -6,8 +6,8 @@ reset
 
 set term pngcairo transparent font "DejaVuSerif, 18pt" size 1000,900 #postscript enhanced solid color font "DejaVuSerif, 18pt"
 set output "contour.png" #"contour.eps"
-# UNCOMMENTFORKEY set key above #top left
-# UNCOMMENTFORNOKEY unset key
+#  set key above #top left
+# # unset key
 set key above
 set size ratio -1
 set tics out
@@ -17,19 +17,19 @@ set datafile separator ","
 
 
 #autofreq start,incr:
-#1STNOCOMMENT set ylabel "y [{/Symbol m}m]"
-#1STNOCOMMENT set xlabel "x [{/Symbol m}m]"
-#1STNOCOMMENT set xtics autofreq 100
-#1STNOCOMMENT set ytics autofreq 100
+## set ylabel "y [{/Symbol m}m]"
+## set xlabel "x [{/Symbol m}m]"
+## set xtics autofreq 100
+## set ytics autofreq 100
 set ylabel "y [{/Symbol m}m]"
 set xlabel "x [{/Symbol m}m]"
 set xtics autofreq 100
 set ytics autofreq 100
 
-#1STCOMMENT set xtics autofreq 0,100 
-#1STCOMMENT unset ylabel
-#1STCOMMENT unset xlabel
-#1STCOMMENT set format y ""
+# set xtics autofreq 0,100 
+# unset ylabel
+# unset xlabel
+# set format y ""
 
 set xrange [-350:350]
 set yrange [-30:500]

@@ -2,15 +2,17 @@
 
 thisdir=$(pwd)
 
-radii="220e-6 160e-6 120e-6"
-keyIn="120e-6"
-start_time="80e-6"
+radii="220e-6 160e-6 130e-6"
+keyIn="130e-6"
+start_time="60e-6"
 
 echo "NOTE: if somewhere/contour/*.csv are missing"
-echo "      then execute once"
-echo "         python render_2D_contours.py"
-echo "         python merge_split_files.py"
-echo "      in the dir where they are missing"
+echo "NOTE: then execute once"
+echo "NOTE:    python render_2D_contours.py"
+echo "NOTE:    python merge_split_files.py"
+echo "NOTE: in the dir where they are missing"
+echo "NOTE: everything else is set in the plot_contour_at_radius.gnuplot.backup"
+echo "-------------------------------------------------------------------------"
 
 i=1
 for radius in $radii
@@ -48,6 +50,6 @@ for radius in $radii;do
     convert contour.png contour_${radius}_radius.png -background white -gravity center -compose dstover -composite contour.png
 done
 
-convert contour.png -background white -flatten contour.jpg
+convert contour.png -background white -flatten -trim contour.jpg
 rm contour*.png
 
