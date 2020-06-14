@@ -35,7 +35,12 @@ append_files_to_gnuplot_script () {
     data=$1
     title=$2
     suffix=$3
-    echo "\"${data}\"   u ((\$1)*1e6):((\$2)*1e6) w lp t \"${title}\"${suffix}" >> plot_Tc.gnuplot 
+    if [ $# == 4 ];then
+        lc=$4
+        echo "\"${data}\"   u ((\$1)*1e6):((\$2)*1e6) w lp lc $lc t \"${title}\"${suffix}" >> plot_Tc.gnuplot 
+    else
+        echo "\"${data}\"   u ((\$1)*1e6):((\$2)*1e6) w lp t \"${title}\"${suffix}" >> plot_Tc.gnuplot 
+    fi
 }
 
 study_cases=" \
@@ -71,24 +76,51 @@ study_cases4=" \
 ../conv_study_2mum_Econst_RnChange_maxCo0.2_maxAlphaCo0.08_tRn60mus \
 ../conv_study_1.35mum_Econst_RnChange_maxCo0.2_maxAlphaCo0.08_tRn60mus \
 ../conv_study_1mum_Econst_RnChange_maxCo0.2_maxAlphaCo0.08_tRn60mus \
+../conv_study_0.6mum_Econst_RnChange_maxCo0.2_maxAlphaCo0.08_tRn60mus_fromBerlin_naked \
+"
+
+# study_cases5=" \
+# ../sp_conv_study_3mum \
+# ../sp_conv_study_2mum \
+# ../sp_conv_study_1.35mum \
+# ../sp_conv_study_1mum \
+# ../sp_conv_study_0.6mum \
+# ../sp_conv_study_0.4mum \
+# ../sp_conv_study_0.2mum \
+# "
+
+study_cases6=" \
+../conv_study_3mum_refine \
+../conv_study_2mum_refine \
+../conv_study_1.35mum_refine \
+../conv_study_1mum_refine \
+../conv_study_0.75mum_refine \
+../conv_study_0.6mum_refine \
 "
 
 echo "" > Tc_RnChange.dat
 echo "" > Tc_Econst.dat
 echo "" > Tc_maxCo01.dat
 echo "" > Tc_tRn60mus.dat
+echo "" > Tc_refine.dat
+# echo "" > Tc_spherical.dat
 
 make_Tc_dat $study_cases  -f=Tc_RnChange.dat
 make_Tc_dat $study_cases2 -f=Tc_Econst.dat
 make_Tc_dat $study_cases3 -f=Tc_maxCo01.dat
 make_Tc_dat $study_cases4 -f=Tc_tRn60mus.dat
+make_Tc_dat $study_cases5 -f=Tc_spherical.dat
+make_Tc_dat $study_cases6 -f=Tc_refine.dat
 
 cp plot_Tc.gnuplot.backup plot_Tc.gnuplot
 
 append_files_to_gnuplot_script Tc_RnChange.dat "E=const." ",\\" 
 append_files_to_gnuplot_script Tc_Econst.dat   "E=const. + adapt R_n" ",\\"  
 append_files_to_gnuplot_script Tc_maxCo01.dat  "E=const. + adapt R_n + maxCo=0.1" ",\\" 
-append_files_to_gnuplot_script Tc_tRn60mus.dat "E=const. + adapt R_n + maxCo=0.2 + maxAlphaCo0.08 +tRn60-75" " "
+append_files_to_gnuplot_script Tc_tRn60mus.dat "E=const. + adapt R_n + maxCo=0.2 + maxAlphaCo0.08 +tRn60-75" ",\\"
+append_files_to_gnuplot_script Tc_refine.dat "E=const. etc + refined mesh" " " 7
+
+# append_files_to_gnuplot_script Tc_spherical.dat "E=const. + etc. + spherical" " "
 
 gnuplot plot_Tc.gnuplot
 epstopdf Tc.eps

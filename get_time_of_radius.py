@@ -26,6 +26,13 @@ def radius_old(alpha_vol, cellsize=1e-6):
     theta=thet/180.*np.pi
     return ((alpha_vol)*3./(4.*theta))**(1/3.)
 
+def find_first_hit(radii,sradius):
+    lastitem = radii[0]
+    for num,item in enumerate(radii):
+        if (lastitem-sradius)*(item-sradius) < 0:
+            return num
+        lastitem = item
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", "--radius", help="radius in meters!", type=float, required=True)
@@ -34,7 +41,7 @@ def main():
                         #default=2)
     parser.add_argument("-t", "--begin_time", help="time to start scanning", type=float, required=True)
     parser.add_argument("-e", "--end_time", help="time to start scanning", type=float, required=False, 
-                        default=1e-3)
+                        default=101e-6)
     
     # NOTE: "This script is written for cases which write theta (half opening angle in degrees)
     #        into THETA file in case dir"
@@ -67,7 +74,8 @@ def main():
     start_index = np.argmin(np.abs(times - args.begin_time))
     end_index = np.argmin(np.abs(times - args.end_time))
     radii = radius(a[start_index:end_index].T[1],theta)
-    calc_time_index = np.argmin(np.abs(radii - args.radius))
+    #calc_time_index = np.argmin(np.abs(radii - args.radius))
+    calc_time_index = find_first_hit(radii,args.radius)
         
     print(times[calc_time_index + start_index])
     
