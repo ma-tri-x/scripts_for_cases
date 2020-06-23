@@ -16,13 +16,13 @@ set y2label "amount of cells [10^3]"
 set y2tics nomirror
 set ytics nomirror
 
-set xrange [0.45:3.2]
-set yrange [1:10000]
-set y2range [0:450]
+set xrange [*:*]
+set yrange [0.1:*]
+set y2range [0:*]
 
 set tmargin at screen 0.8
 
-a=3400./60.
+a=1
 b=3
 c=1
 
