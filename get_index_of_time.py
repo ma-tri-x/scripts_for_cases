@@ -31,7 +31,12 @@ def main():
     
     times = np.sort(time_steps)
     
-    print(np.argmin(np.abs(times -time)))
+    index = np.argmin(np.abs(times -time))
+    
+    if index == len(times)-1:
+        index = index - 1
+    
+    print(index)
     
 if __name__=="__main__":
     main()
