@@ -1,0 +1,169 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+ 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'printf ($1)')])
+define(calcint, [esyscmd(perl -e 'printf int($1)')])
+define(writeTheta, [esyscmd(echo '$1' > THETA)])
+define(PI, 3.14159265358979323846264338327950288)
+ 
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+define(X, _BUBBLE-RSTART)
+define(XF,_BUBBLE-RMAX)
+define(cs,_MESH-CELLSIZE)
+//define(XFF,150e-3)
+//define(XFFF,210e-3)
+define(XFF,10e-03)
+define(XFFF,100e-03)
+define(nphi,calcint(X/cs))
+define(piOverFour,calc(PI/4.))
+//define(alphaHalf,piOverFour/(nphi))
+define(alphaHalf,calc(2.*piOverFour/90.))
+writeTheta(1.0)
+define(sinalphaHalf,sin(alphaHalf))
+define(cosalphaHalf,cos(alphaHalf))
+define(x_axis, calc(cosalphaHalf*X))
+define(yz_axis_p, calc(sinalphaHalf*X))
+define(yz_axis_n, -yz_axis_p)
+define(XF_axis, calc(cosalphaHalf*XF))
+define(YZF_axis_p, calc(sinalphaHalf*XF))
+define(YZF_axis_n, -YZF_axis_p)
+define(XFF_axis, calc(cosalphaHalf*XFF))
+define(YZFF_axis_p, calc(sinalphaHalf*XFF))
+define(YZFF_axis_n, -YZFF_axis_p)
+define(XFFF_axis, calc(cosalphaHalf*XFFF))
+define(YZFFF_axis_p, calc(sinalphaHalf*XFFF))
+define(YZFFF_axis_n, -YZFF_axis_p)
+define(dxmin1,calc(X/nphi))
+define(dxmin2,calc(XF*piOverFour/nphi))
+define(dxmin3,calc(XFF*piOverFour/nphi))
+define(length1,calc(XF-X))
+define(length2,calc(XFF-XF))
+define(length3,calc(XFFF-XFF))
+define(ax1,calc(piOverFour*XF/X))
+define(ax2,calc(XFF/XF))
+define(rx1,calc((length1-dxmin1)/(length1-ax1*dxmin1)))
+define(rx2,calc((length2-dxmin2)/(length2-ax2*dxmin2)))
+define(rx3,1.2)
+define(nx1,calcint(1+log(ax1)/log(rx1)))
+define(nx2,calcint(1+log(ax2)/log(rx2)))
+define(ax3,calc((length3*(rx3-1)+dxmin3)/(rx3*dxmin3)))
+define(nx3,calcint(1+log(ax3)/log(rx3)))
+
+vertices
+(
+(0 0 0)                  vlabel(u1)
+(x_axis yz_axis_n  yz_axis_n) vlabel(rd)
+(x_axis yz_axis_p  yz_axis_n) vlabel(ru)
+(0 0 0)                  vlabel(u2)
+(x_axis yz_axis_p  yz_axis_p) vlabel(fu)
+(x_axis yz_axis_n  yz_axis_p) vlabel(fd)
+
+(XF_axis YZF_axis_n  YZF_axis_n) vlabel(RD)
+(XF_axis YZF_axis_p  YZF_axis_n) vlabel(RU)
+(XF_axis YZF_axis_p  YZF_axis_p) vlabel(FU)
+(XF_axis YZF_axis_n  YZF_axis_p) vlabel(FD)
+
+(XFF_axis YZFF_axis_n  YZFF_axis_n) vlabel(RFD)
+(XFF_axis YZFF_axis_p  YZFF_axis_n) vlabel(RFU)
+(XFF_axis YZFF_axis_p  YZFF_axis_p) vlabel(FFU)
+(XFF_axis YZFF_axis_n  YZFF_axis_p) vlabel(FFD)
+
+(XFFF_axis YZFFF_axis_n  YZFFF_axis_n) vlabel(RFFD)
+(XFFF_axis YZFFF_axis_p  YZFFF_axis_n) vlabel(RFFU)
+(XFFF_axis YZFFF_axis_p  YZFFF_axis_p) vlabel(FFFU)
+(XFFF_axis YZFFF_axis_n  YZFFF_axis_p) vlabel(FFFD)
+);
+ 
+blocks
+(
+  hex (u1 fd rd u1 u2 fu ru u2)     (nphi 1 1) simpleGrading (1 1 1) 
+  hex (fd FD RD rd fu FU RU ru)     (nx1 1 1) simpleGrading (ax1 1 1)
+  hex (FD FFD RFD RD FU FFU RFU RU) (nx2  1 1) simpleGrading (ax2 1 1)  
+  hex (FFD FFFD RFFD RFD FFU FFFU RFFU RFU) (nx3  1 1) simpleGrading (ax3 1 1)    
+);
+ 
+edges
+(
+);
+ 
+patches
+(
+        wedge front
+        (
+           (u1 u2 ru rd)
+           (ru RU RD rd)
+           (RU RFU RFD RD)
+           (RFU RFFU RFFD RFD)           
+        )
+
+        wedge back
+        (
+          (u1 fd fu u2)
+          (fd FD FU fu)
+          (FD FFD FFU FU)
+          (FFD FFFD FFFU FFU)          
+        )
+
+        patch side
+        (
+            //(rd ru fu fd)
+            //(RD RU FU FD)
+            //(RFD RFU FFU FFD)
+            (RFFD RFFU FFFU FFFD)            
+        )
+
+        wedge top
+        (
+            (ru fu u2 ru)
+            (RU FU fu ru)
+            (RFU FFU FU RU)
+            (RFFU FFFU FFU RFU)            
+        )
+
+        wedge bottom
+        (
+            (u1 rd fd u1)
+            (rd RD FD fd)
+            (RD RFD FFD FD)
+            (RFD RFFD FFFD FFD)
+        )
+
+        empty axis
+        (
+            (u1 u2 u2 u1)
+        )
+
+);
+
+
+mergePatchPairs
+(
+);
