@@ -11,7 +11,7 @@
         "tTransitStart": 9e-05, 
         "Rn": 0.0001841, 
         "dtTransit": 1.5e-05,
-        "boxBubble" : "true"
+        "boxBubble" : "false"
     }, 
     "decompose": {
         "xyz": "8 2 1", 
@@ -28,10 +28,10 @@
         "maxCo": 0.2, 
         "maxDeltaT": 5e-08, 
         "startTime": 0.0, 
-        "writeInterval": 5e-7, 
+        "writeInterval": 50, 
         "printInfos": "false", 
         "endTime": 0.000101, 
-        "writeControl": "adjustableRunTime", 
+        "writeControl": "timeStep", 
         "stayBelowAcousticCo": 8.0
     },
     "mapFields": {
@@ -66,6 +66,7 @@
     "mesh": {
         "meshDims": "\"2D\"", 
         "snappyHexMesh": "true", 
+        "makeAxialMesh": "false",
         "refineMesh": "false", 
         "meshFile": "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta.m4", 
         "domainSizeFactorRmax": 80, 
@@ -77,6 +78,15 @@
         "meshCoreSize": 8e-05, 
         "stitchMesh": "true", 
         "numPer90deg": 120
+    },
+    "refine" : {
+        "directions" : "tan1 tan2",
+        "automaticRefine" : "false",
+        "refDistsInRmax" : "\"60 15 9 6 3 2 1 0.8 0.5 0.2\"",
+        "refineFrom" : 80e-6,
+        "refineUntil": 3e-3,
+        "refineTimes" : 6,
+        "notes" : "tan1 tan2 tan3 for 3D"
     },
     "funkySetFields": {
         "cellSizeFactorInterface": 3.5, 
