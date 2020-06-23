@@ -41,6 +41,14 @@ study_cases6=" \
 ../conv_study_0.6mum_Econst_RnChange_maxCo0.2_maxAlphaCo0.08_tRn60mus_fromBerlin_naked  \
 "
 
+study_cases7=" \
+../conv_study_3mum_refine_low_res \
+../conv_study_2mum_refine_low_res \
+../conv_study_1.35mum_refine_low_res \
+../conv_study_1mum_refine_low_res \
+../conv_study_0.75mum_refine_low_res \
+"
+
 ENDTIME=101e-6
 
 plotfile=plot_calc_times.gnuplot
@@ -99,6 +107,7 @@ plot_it(){
     epstopdf calc_times.eps
     pdfcrop calc_times.pdf $outfile
     rm calc_times.eps calc_times.pdf
+    cp $plotfile "plot_${outfile%.pdf}.gnuplot"
 }
 
 prepare_checkMeshs(){
@@ -125,6 +134,7 @@ produce_dat_file "$(cat_together_input_files $study_cases3)" calc_times3.dat
 produce_dat_file "$(cat_together_input_files $study_cases4)" calc_times4.dat
 produce_dat_file "$(cat_together_input_files $study_cases5)" calc_times5.dat
 produce_dat_file "$(cat_together_input_files $study_cases6)" calc_times6.dat
+produce_dat_file "$(cat_together_input_files $study_cases7)" calc_times7.dat
 
 
 cp $plotfile.backup $plotfile
@@ -183,3 +193,14 @@ echo "f(x) t sprintf(\"%.1f /(res.)^{%.1f} + %.1f\",a,b,c),\\
 
 plot_it calc_times_Econst_RnChange_maxCo0.2_maxAlphaCo0.08_tRn60mus.pdf
 #---------------
+
+#refine_low_res
+cp $plotfile.backup $plotfile
+
+usage="1:((\$2)/60.*(\$4)/${ENDTIME})"
+sed -i "s#FIT#fit \[0.7:\*\] f(x) \"calc_times7.dat\" u $usage via a,b#g" $plotfile
+echo "f(x) t sprintf(\"%.1f /(res.)^{%.1f} + %.1f\",a,b,c),\\
+     \"calc_times7.dat\"  u $usage w p ps 2 lw 3 t \"times Ryzen\",\\
+     \"calc_times7.dat\"  u 1:((\$3)/1e3) w p ps 2 pt 2 lw 3 lc 8 axis x1y2 t \"amount of cells\"">> $plotfile
+
+plot_it calc_times_refine_low_res.pdf
