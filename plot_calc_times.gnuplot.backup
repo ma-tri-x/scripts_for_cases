@@ -1,0 +1,35 @@
+#!/bin/gnuplot
+
+reset
+set term postscript eps color enhance solid font "DejaVuSerif, 22"
+set output "calc_times.eps"
+
+set grid
+set key above
+
+#set title TITLE
+
+set xlabel "res. [{/Symbol m}m]"
+set ylabel "calc. time [min]"
+set y2label "amount of cells [10^3]"
+
+set y2tics nomirror
+set ytics nomirror
+
+set xrange [0.45:3.2]
+set yrange [1:10000]
+set y2range [0:450]
+
+set tmargin at screen 0.8
+
+a=3400./60.
+b=3
+c=1
+
+f(x) = a/x**b + c
+
+FIT
+
+set logscale y
+
+p \

@@ -1,0 +1,128 @@
+{
+ "funkySetFields": {
+  "cellSizeFactorInterface": 3.5, 
+  "notes": "pressureProfile=hom/mirrorbubble/developed, Uprofile=zero/mirrorbubble/wicked", 
+  "widthOfInterface": 2e-08, 
+  "pressureProfile": "hom", 
+  "Uprofile": "zero", 
+  "U_interface": 0.0
+ }, 
+ "schemes": {
+  "Alpha1SnGrad": "limited 0.5 skewCorrected", 
+  "laplacian": "Gauss skewCorrected linear corrected", 
+  "ddt": "Euler", 
+  "snGrad": "none", 
+  "div": "Gauss vanLeer phi", 
+  "grad": "Gauss skewCorrected linear", 
+  "prghsnGrad": "limited 0.8 skewCorrected", 
+  "alpha2div": "Gauss interfaceCompression", 
+  "interpolation": "linear"
+ }, 
+ "liquid": {
+  "B": 305000000.0, 
+  "notes": "mu=1.002e-3, gamma=7.15, B=3046e5", 
+  "pInf": 101315, 
+  "mu": 0.001002, 
+  "rho": 998.20608789369, 
+  "gamma": 7.15
+ }, 
+ "transportProperties": {
+  "pV": 0.0, 
+  "notes": "sigma=0.0725", 
+  "Tref": 293.15, 
+  "psiZero": 1e-16, 
+  "gasConstGeneral": 8.3144621, 
+  "sigma": 0.0725
+ }, 
+ "mapFields": {
+  "mapFields": "false", 
+  "sourceDir": "../0045_91_lbPaper_RC_1.35", 
+  "options": ""
+ }, 
+ "allcleanBeforeOrun": "true", 
+ "run_calc_in_allrun": "false", 
+ "gas": {
+  "pMin": 2.5, 
+  "notes": "mu=18.6e-6, beta=0.00154011027003978", 
+  "mu": 1.86e-05, 
+  "specGasConst": 287.0, 
+  "beta": 0.0, 
+  "gamma": 1.4
+ }, 
+ "controlDict": {
+  "deltaT": 1e-11, 
+  "machSwitch": 0.6, 
+  "maxAlphaCo": 0.2, 
+  "radiusRatioSwitchToAcousticCo": 0.1, 
+  "maxAcousticCo": 1.0, 
+  "maxDeltaT": 5e-08, 
+  "startTime": 0, 
+  "writeInterval": 50, 
+  "printInfos": "false", 
+  "endTime": 0.0005, 
+  "writeControl": "timeStep", 
+  "maxCo": 0.2
+ }, 
+ "mesh": {
+  "meshDims": "\"2D\"", 
+  "refineMesh": "false", 
+  "meshFile": "blockMeshDict_axisymm_coreCart_reg.m4", 
+  "domainSizeFactorRmax": 80, 
+  "FactorBubbleDomainRmax": 1.2, 
+  "cellSize": 8e-07, 
+  "NoRefineSteps": 2, 
+  "numPer45deg": 45, 
+  "executeBlockMesh": "true", 
+  "meshCoreSize": 8e-05, 
+  "numPer90deg": 90
+ }, 
+ "otherControls": {
+  "useConstantTheta": "false", 
+  "decayWicked": 0.00012, 
+  "coreRim": 1e-05, 
+  "refineRadius": 0.0004, 
+  "inletU": 1.0, 
+  "restrictU": "true", 
+  "constantTheta": 2.0, 
+  "dxMinHalf": 2e-06, 
+  "limitAlpha": "true"
+ }, 
+ "foam_extend_version": "4.0", 
+ "solverControls": {
+  "useIsoAdvector": "false", 
+  "cAlpha": 1, 
+  "transonic": "false", 
+  "removeUy": "false", 
+  "alpha2TildeMin": 1e-06, 
+  "solver": "localMassCorr_working_db69ebf", 
+  "applyDgdtCut": "true", 
+  "nAlphaCorr": 2, 
+  "nCorrectors": 3, 
+  "predictor": "true", 
+  "solverDir": "localMassCorr_working", 
+  "nAlphaSubCycles": 4, 
+  "dgdtCutLiq": 0.999, 
+  "dgdtCutGas": 0.001, 
+  "removeUz": "false", 
+  "nNonOrthogonalCorrectors": 2, 
+  "nOuterCorrectors": 1, 
+  "MassCorr": "local", 
+  "psiAlteration": "true"
+ }, 
+ "bubble": {
+  "D_star": 0.042, 
+  "D_init": 2.1e-05, 
+  "Rmax": 0.000495, 
+  "aimedRn": 6.4e-05, 
+  "Rstart": 2e-05, 
+  "tTransitStart": 9e-05, 
+  "Rn": 0.0001841, 
+  "dtTransit": 1.5e-05
+ }, 
+ "decompose": {
+  "xyz": "2 3 1", 
+  "threads": 6, 
+  "method": "metis", 
+  "decompose": "true"
+ }
+}

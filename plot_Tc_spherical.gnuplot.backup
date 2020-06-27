@@ -1,0 +1,15 @@
+#!/bin/gnuplot
+
+reset
+set term postscript eps color enhanced solid font "DejaVuSerif, 18"
+set output "Tc.eps"
+
+set grid
+set key above
+
+set ylabel "2 T_{c} [{/Symbol m}s]"
+set xlabel "cell size in initial bubble area [{/Symbol m}m]"
+
+SETTINGS
+
+p \

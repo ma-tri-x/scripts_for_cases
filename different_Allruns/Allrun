@@ -46,7 +46,7 @@ then
 fi
 ###########################################
 
-meshFile=constant/polyMesh/blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta.m4
+meshFile=constant/polyMesh/blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta_V2.m4
 
 if [ "false" = "true" ]
 then
@@ -55,7 +55,7 @@ then
 fi
 
 echo "m4ing ..."
-m4 constant/polyMesh/blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta.m4 > constant/polyMesh/blockMeshDict
+m4 constant/polyMesh/blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta_V2.m4 > constant/polyMesh/blockMeshDict
 
 copy_0backup
  
@@ -75,30 +75,57 @@ fi
 if [ "false" = "true" ]
 then
     echo "prepare refining mesh..."
+    rm system/cellSetDict.?
+    rm system/cellSetDict.??
     #n0=_MESH-STARTCELLAMOUNT
-    #csgoal=1e-06GOAL
+    #csgoal=3e-06GOAL
     #size=_MESH-SIZE
-    iterations=_REFINE-REFINETIMES #$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0**(1./3.))/$csgoal)/log(2.)) )')")
-    iterations=`expr $iterations + 1`
-    if [ $iterations -gt 13 ]
+    if [ false = "true" ]
     then
-        echo "impossible number of iterations: $iterations > 10"
-        exit 1
+        iterations=6 #$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0**(1./3.))/$csgoal)/log(2.)) )')")
+        iterations=`expr $iterations + 1`
+        if [ $iterations -gt 13 ]
+        then
+            echo "impossible number of iterations: $iterations > 10"
+            exit 1
+        fi
+        refineUntil=0.003
+        refineFrom=8e-05
+        j=1
+        while [ $j -lt $iterations ] ; do
+            echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
+            cp system/cellSetDict.1.backup system/cellSetDict.$j
+            dinit=0.000792
+            if [ $(python check_str_in_str.py "axisymm_radial" "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta_V2.m4") ]
+            then
+                dinit=0.0
+            fi
+            sed -i "s/dinit/${dinit}/g" system/cellSetDict.$j
+            refDist=$(m4 <<< "esyscmd(perl -e 'printf (  (${refineUntil} - ${refineFrom} )*(($j - $iterations )/( $iterations -1.))**2 +$refineFrom )')")
+            sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
+    #         refDist=$(m4 <<< "esyscmd(perl -e 'printf ( $refDist - $distOfRefineStep  )')")
+            j=`expr $j + 1`
+        done
+    else
+        refDistsInRmax="60 15 9 6 3 2 1 0.8 0.5 0.2"
+        j=1
+        for refDistRmax in $refDistsInRmax;do
+            echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
+            cp system/cellSetDict.1.backup system/cellSetDict.$j
+            dinit=0.000792
+            if [ $(python check_str_in_str.py "axisymm_radial" "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta_V2.m4") ]
+            then
+                dinit=0.0
+            fi
+            sed -i "s/dinit/${dinit}/g" system/cellSetDict.$j
+            refDist=$(m4 <<< "esyscmd(perl -e 'printf (  $refDistRmax * 0.000495 )')")
+            sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
+            if [[ $j == 8 ]];then
+                sed -i "s#//  boxToCell#boxToCell#g" system/cellSetDict.$j
+            fi
+            j=`expr $j + 1`
+        done
     fi
-    refineUntil=_MESH-REFINEUNTIL
-    #distOfRefineStep=$(m4 <<< "esyscmd(perl -e 'printf (  $refineUntil/$iterations )')")
-    #echo "distOfRefineStep = $distOfRefineStep"
-    #refDist=$refineUntil
-    j=1
-    while [ $j -lt $iterations ] ; do
-        echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
-        cp system/cellSetDict.1.backup system/cellSetDict.$j
-        sed -i "s/dinit/0.000792/g" system/cellSetDict.$j
-        refDist=$(m4 <<< "esyscmd(perl -e 'printf (  $refineUntil/(1.-$iterations)**2 * ($j - $iterations)**2)')")
-        sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
-#         refDist=$(m4 <<< "esyscmd(perl -e 'printf ( $refDist - $distOfRefineStep  )')")
-        j=`expr $j + 1`
-    done
     j=1
     while [ -e system/cellSetDict.$j ] ; do
         echo "refining step $j..."
@@ -114,17 +141,20 @@ then
     done
 fi
 
-if [ "_MESH-MAKEAXIALMESH" = "true" ]
+if [ "false" = "true" ]
 then
     echo "making axial mesh with angle 4 degrees and patch names frontandback"
     makeAxialMesh -wedge frontandback -wedgeAngle 4 -axis axis > log.makeAxialMesh
     echo "collapsingEdges ..."
     collapseEdges 1e-8 180 -overwrite > log.collapseEdges
-    cp 0/polyMesh/* constant/polyMesh/ # <-important bec otherwise decomposePar wont write processor*/0 folders
-    rm -rf 0/polyMesh # <-important bec otherwise decomposePar wont write processor*/0 folders
+    if [ -d 0/polyMesh ]
+    then
+        cp 0/polyMesh/* constant/polyMesh/ # <-important bec otherwise decomposePar wont write processor*/0 folders
+        sed -i "s/symmetryPlane/empty/g" 0/polyMesh/boundary
+        rm -rf 0/polyMesh # <-important bec otherwise decomposePar wont write processor*/0 folders
+    fi
     checkMesh > log.checkMesh
     sed -i "s/symmetryPlane/empty/g" constant/polyMesh/boundary
-    sed -i "s/symmetryPlane/empty/g" 0/polyMesh/boundary
     echo $(grep -E "Zero|zero|skew|Skew" log.checkMesh)
 #     exit 0
 fi
@@ -173,7 +203,7 @@ Uif=0.0
 
 if [ "false" = 'true' ];then
     echo "Converting volume to a grid fitting box volume..."
-    cellsize=1e-06
+    cellsize=3e-06
     sphereVol=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.*(${R})**3  )')")
     if [ ""2D"" = "3D" ];then
         boxEdgeLength_theory=$(m4 <<< "esyscmd(perl -e 'printf (   (${sphereVol})**(1./3.)  )')")
@@ -233,14 +263,18 @@ if [ "false" = "false" ]
 then
     echo "" > log.setFields
     offset=0.000792
-    if [ "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta.m4" = "blockMeshDict_axisymm_ChCore.m4" ]
+    if [ "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta_V2.m4" = "blockMeshDict_axisymm_ChCore.m4" ]
     then
         offset=$(m4 <<< "esyscmd(perl -e 'printf ( $R + 1e-6 )')")
     fi 
-    if [ $(python check_str_in_str.py "blockMeshDict_axisymm_coreCart_reg_unbound" "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta.m4") ]
+    if [ $(python check_str_in_str.py "blockMeshDict_axisymm_coreCart_reg_unbound" "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta_V2.m4") ]
     then
         offset=0.0
     fi 
+    if [ $(python check_str_in_str.py "axisymm_radial" "blockMeshDict_axisymm_coreCart_reg_unbound_writeTheta_V2.m4") ]
+    then
+        offset=0.0
+    fi
     dist=$offset
 
     unit_vector="vector(pos().x,pos().y-$dist,pos().z)/\
@@ -315,13 +349,26 @@ then
             fi
             theta=$(cat THETA)
             true_alpha2_vol=$(m4 <<< "esyscmd(perl -e 'printf (  $true_alpha2_vol *180./${theta}  )')")
+        elif [ ""2D"" = "1D" ];then
+            if [ ! -e THETA ];then
+                echo "ERROR: alter your meshDict.m4 such that it writes theta into THETA"
+                exit 1
+            fi
+            theta=$(cat THETA)
+            theta_rad=$(m4 <<< "esyscmd(perl -e 'printf (  ${theta}*${pi}/180.  )')")
+            true_alpha2_vol=$(m4 <<< "esyscmd(perl -e 'use Math::Trig; printf (  ${true_alpha2_vol}*${pi}/(tan(${theta_rad}))**2  )')")
         fi
         Vn=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${Rn}**(3.)  )')")
         V0=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${R}**(3.)  )')")
-        Rnew=$(m4 <<< "esyscmd(perl -e 'printf (   (${true_alpha2_vol}/(4.*${pi})*3)**(1./3.)  )')")
+        R=$(m4 <<< "esyscmd(perl -e 'printf (   (${true_alpha2_vol}/(4.*${pi})*3)**(1./3.)  )')")
         Ebubble=$(m4 <<< "esyscmd(perl -e 'printf (   ($pBubble * $V0 - $pn * $Vn )/($gamma -1.)  )')")
         pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   ($Ebubble * ($gamma -1.) + $pn *$Vn )/$true_alpha2_vol  )')")
-        echo "R_0neu           = $Rnew "
+        echo "python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble"
+        Rn=$(python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble --pinf $pStat )
+        echo $Rn > Rn_export
+        pn=$(m4 <<< "esyscmd(perl -e 'printf (${pStat} + 2.*${sigma}/${Rn} -${pV}  )')")
+        echo "R_0new           = $R "
+        echo "R_n_new          = $Rn "
         echo "pBubble          = $pBubble "
         funkySetFields -case . -field $pVar -expression "${pBubble}*(1.-alpha1)+${pStat}*alpha1"\
                     -time $time -keepPatches >> log.setFields

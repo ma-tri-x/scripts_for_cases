@@ -141,6 +141,16 @@ then
     done
 fi
 
+if [ "_MESH-REFINEWALL" = "true" ]
+then
+    cp system/cellSetDict.wall system/cellSetDict
+    cellSet > log.cellSet
+    echo "refining wall..."
+    runRefineMesh # eigene Funktion! Siehe oben
+    cp -r $(python find_biggestNumber.py -p .)/polyMesh/* constant/polyMesh
+    rm -rf $(python find_biggestNumber.py -p .)
+fi
+
 if [ "_MESH-MAKEAXIALMESH" = "true" ]
 then
     echo "making axial mesh with angle 4 degrees and patch names frontandback"

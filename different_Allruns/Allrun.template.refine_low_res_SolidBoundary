@@ -95,12 +95,7 @@ then
         while [ $j -lt $iterations ] ; do
             echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
             cp system/cellSetDict.1.backup system/cellSetDict.$j
-            dinit=_BUBBLE-D_INIT
-            if [ $(python check_str_in_str.py "axisymm_radial" "_MESH-MESHFILE") ]
-            then
-                dinit=0.0
-            fi
-            sed -i "s/dinit/${dinit}/g" system/cellSetDict.$j
+            sed -i "s/dinit/_BUBBLE-D_INIT/g" system/cellSetDict.$j
             refDist=$(m4 <<< "esyscmd(perl -e 'printf (  (${refineUntil} - ${refineFrom} )*(($j - $iterations )/( $iterations -1.))**2 +$refineFrom )')")
             sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
     #         refDist=$(m4 <<< "esyscmd(perl -e 'printf ( $refDist - $distOfRefineStep  )')")
@@ -112,12 +107,7 @@ then
         for refDistRmax in $refDistsInRmax;do
             echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
             cp system/cellSetDict.1.backup system/cellSetDict.$j
-            dinit=_BUBBLE-D_INIT
-            if [ $(python check_str_in_str.py "axisymm_radial" "_MESH-MESHFILE") ]
-            then
-                dinit=0.0
-            fi
-            sed -i "s/dinit/${dinit}/g" system/cellSetDict.$j
+            sed -i "s/dinit/_BUBBLE-D_INIT/g" system/cellSetDict.$j
             refDist=$(m4 <<< "esyscmd(perl -e 'printf (  $refDistRmax * _BUBBLE-RMAX )')")
             sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
             if [[ $j == _REFINE-ADDBOXTOCELLSETDICTNUMBER ]];then
@@ -271,10 +261,6 @@ then
     then
         offset=0.0
     fi 
-    if [ $(python check_str_in_str.py "axisymm_radial" "_MESH-MESHFILE") ]
-    then
-        offset=0.0
-    fi
     dist=$offset
 
     unit_vector="vector(pos().x,pos().y-$dist,pos().z)/\

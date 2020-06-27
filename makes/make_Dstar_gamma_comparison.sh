@@ -26,15 +26,18 @@ study_cases=" \
 ../dstar_1.6 \
 ../dstar_1.8 \
 "
-echo "#dstar    Rmax  ydist"
-echo "#dstar    Rmax  ydist" > Rmax_ydist_of_dstar.dat
+outfile=Rmax_ydist_of_dstar.dat
+
 if [ $remake == "y" ]
 then
     echo "RmaxMethod top-center (c), Volume (v)?"
     read RmaxMethod
     echo "ydistMethod center (c), centerRmax (r), by D* at t=0 (d)?"
     read ydistMethod
+    thetime=""
     if [ $ydistMethod == "c" ];then echo "at which time?";read thetime;fi
+    echo "#Rmax${RmaxMethod}_ydist${ydistMethod}$thetime" | tee $outfile
+    echo "#dstar    Rmax  ydist" | tee -a $outfile
     for i in $study_cases;do
         cp get_time_of_Rmax.py $i/
         cd $i
@@ -69,12 +72,12 @@ then
             ydist=$center
             Rmax=$(python <<< "print($top - $center)")
         fi
-        echo "$dstar    $Rmax   $ydist"
-        echo "$dstar    $Rmax   $ydist" >> $thisdir/Rmax_ydist_of_dstar.dat
         cd $thisdir
+        echo "$dstar    $Rmax   $ydist" | tee -a $outfile
     done
 fi
 
+method=$(head -n 1 $outfile | sed "s/#//g")
     
 if [ $linear == "l" ]
 then
@@ -83,5 +86,5 @@ else
     gnuplot plot_Dstar_gamma_comparison.gnuplot
 fi
 epstopdf Dstar_gamma_comparison.eps
-pdfcrop Dstar_gamma_comparison.pdf Dstar_gamma_comparison.pdf
-rm Dstar_gamma_comparison.eps
+pdfcrop Dstar_gamma_comparison.pdf Dstar_gamma_comparison_$method.pdf
+rm Dstar_gamma_comparison.eps Dstar_gamma_comparison.pdf
