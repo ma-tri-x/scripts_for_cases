@@ -38,6 +38,6 @@ set tmargin at screen 0.73
 set key above
 # set xlabel "Year"
 # set ylabel "Population(in millions)"
-dstar_to_gamma(x)=1.01*x+0.01
+dstar_to_gamma(x)=1.01247*x+0.00918621
 plot "vortices_simulated.dat" u (dstar_to_gamma(($1))):2 w p ps 3 pt 3 lw 1.8 lc rgbcolor "#006600" title "calculated"
 unset multiplot

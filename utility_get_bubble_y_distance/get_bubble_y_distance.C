@@ -61,7 +61,11 @@ int main(int argc, char *argv[])
     
     fileName dataDir=mesh.time().path();
     word dataFile="bubble_y_distance.dat";
+    word dataFileMax="bubble_y_distance_max.dat";
+    word dataFileMin="bubble_y_distance_min.dat";
     OFstream costr(dataDir/dataFile);
+    OFstream costrMax(dataDir/dataFileMax);
+    OFstream costrMin(dataDir/dataFileMin);
     forAll(timeDirs, timeI)
     {
         runTime.setTime(timeDirs[timeI], timeI);
@@ -103,11 +107,15 @@ int main(int argc, char *argv[])
         double center = 0.5*(bubble_y_distance_max + bubble_y_distance_min) - solid_boundary_location;
         //costr << runTime.timeName() << "    ";
         costr << center << endl;
+        costrMax << bubble_y_distance_max -solid_boundary_location << endl;
+        costrMin << bubble_y_distance_min -solid_boundary_location << endl;
         Info << "solid_boundary_location " << solid_boundary_location << endl;
         Info << "bubble_y_distance_max " << bubble_y_distance_max << endl;
         Info << "bubble_y_distance_min " << bubble_y_distance_min << endl;
         Info << "bubble center " << center << endl;
         Info << "bubble center written to " << dataDir/dataFile << endl;
+        Info << "bubble max_y written to " << dataDir/dataFileMax << endl;
+        Info << "bubble min_y written to " << dataDir/dataFileMin << endl;
     }
     Info<< "\nEnd" << endl;
 

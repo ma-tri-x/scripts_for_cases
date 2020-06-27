@@ -18,7 +18,7 @@ def render_timestep():
     fpath = os.path.dirname(os.path.realpath(__file__))
     case_name = fpath.split("/")[-1]
     
-    state_file="states/inkmap_axisymm.pvsm"
+    state_file="states/inkmap_axisymm_lagrangianInk_vorticity_withText.pvsm"
     print case_name
     replace_dstar_string(state_file,case_name)    
     
@@ -43,7 +43,7 @@ def render_timestep():
     #pv.Render()
     #data_range = slice.GetDataInformation().GetPointDataInformation().GetArrayInformation(0).GetComponentRange(0)
     interval= reader.GetDataInformation().GetCellDataInformation().GetArrayInformation("passiveScalar").GetComponentRange(0)
-    height = 400e-6
+    height = 500e-6
     dstar = float(case_name.split("_")[1])
     scale = 1.5*495e-6
     y_wall = interval[0]*scale # should be: 495e-6*dstar+20e-6

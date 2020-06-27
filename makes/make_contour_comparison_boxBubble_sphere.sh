@@ -2,19 +2,17 @@
 
 thisdir=$(pwd)
 
-times="97e-6 98e-6 99e-6"
+#times="97e-6 98e-6 99e-6"
+times="1e-10 1e-6 4e-6 6e-6"
 
 echo "PLEASE sort in ascending delta x"
 echo "PLEASE put first case twice"
 
 study_cases=" \
-../conv_study_0.6mum_refine \
-../conv_study_0.6mum_refine \
-../conv_study_0.75mum_refine \
-../conv_study_1mum_refine \
-../conv_study_1.35mum_refine \
-../conv_study_2mum_refine \
-../conv_study_3mum_refine \
+../dstar_1.6 \
+../dstar_1.6 \
+../../kk008_batch_simu_Dstar/dstar_1.6 \
+../../kk008_batch_simu_Dstar/dstar_1.6 \
 "
 
 plotfile=plot_contour_at_radius_V2.gnuplot
@@ -61,6 +59,8 @@ do
     k=1
     cp ${plotfile}.backup $plotfile
     sed -i "s/center/$center/g" $plotfile
+    sed -i "s/set xrange.*/set xrange \[-300:300\]/g" $plotfile
+    sed -i "s/set yrange.*/set yrange \[-300:300\]/g" $plotfile
     for j in $study_cases
     do
         data=$(get_contour_path $j $time_in)
@@ -68,10 +68,11 @@ do
         lw=3
         lc=$k
         suffix=",\\"
-        if [[ $k == 1 ]]; then lw=7; lc=7; fi
+        if [[ $k == 1 ]]; then lw=7; lc=7; title="sphere start 1{/Symbol m}m";fi
         if [[ $k == 2 ]]; then lw=7; lc=7; title=""; fi
-        if [[ $k == 3 ]]; then lc="rgbcolor \"0x0000FF\" dt 1"; fi
-        if [[ $k == 4 ]]; then lc="3 dt 1"; fi
+        if [[ $k == 3 ]]; then lc="rgbcolor \"0x0000FF\" dt 1"; title="box start 2{/Symbol m}m"; fi
+        if [[ $k == 4 ]]; then lc="rgbcolor \"0x0000FF\" dt 1"; title="";fi
+        #if [[ $k == 4 ]]; then lc="3 dt 1"; fi
         if [[ $k == 5 ]]; then lc="2 dt 2"; lw=5; fi
         if [[ $k == 6 ]]; then lc="8 dt 1"; fi
         if [[ $k == 7 ]]; then lc="9 dt 1"; fi
@@ -94,6 +95,6 @@ for time_in in $times;do
     convert contour.png contour_${time_in}_sec.png -background white -gravity center -compose dstover -composite contour.png
 done
 
-convert contour.png -background white -flatten contour.jpg
+convert contour.png -background white -flatten contour_dstar1.6.jpg
 rm contour*.png
 

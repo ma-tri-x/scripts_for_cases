@@ -8,7 +8,7 @@ set grid
 set key above
 
 set ylabel "2 T_{c} [{/Symbol m}s]"
-set xlabel "res. [{/Symbol m}m]"
+set xlabel "cell size in initial bubble area [{/Symbol m}m]"
 
 SETTINGS
 
