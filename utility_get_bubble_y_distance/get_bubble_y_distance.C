@@ -85,19 +85,29 @@ int main(int argc, char *argv[])
         
         double bubble_y_distance_max = -100000000.;
         double bubble_y_distance_min = 1000000.;
+        double solid_boundary_location = 1000000.;
         
         forAll(alpha1,celli)
         {
+            double ypos = (mesh.C()[celli]).y();
+            double xpos = (mesh.C()[celli]).x();
+            if ( ypos < solid_boundary_location && xpos < 80e-6 ) solid_boundary_location = ypos;
             if (alpha1[celli] < 0.999){ 
-                double ypos = (mesh.C()[celli]).y();
                 if ( ypos < bubble_y_distance_min ) bubble_y_distance_min = ypos;
                 if ( ypos > bubble_y_distance_max ) bubble_y_distance_max = ypos;
             }
         } 
+        reduce(solid_boundary_location,minOp<scalar>());
         reduce(bubble_y_distance_max,maxOp<scalar>());
         reduce(bubble_y_distance_min,minOp<scalar>());
+        double center = 0.5*(bubble_y_distance_max + bubble_y_distance_min) - solid_boundary_location;
         //costr << runTime.timeName() << "    ";
-        costr << 0.5*(bubble_y_distance_max - bubble_y_distance_min) << endl;
+        costr << center << endl;
+        Info << "solid_boundary_location " << solid_boundary_location << endl;
+        Info << "bubble_y_distance_max " << bubble_y_distance_max << endl;
+        Info << "bubble_y_distance_min " << bubble_y_distance_min << endl;
+        Info << "bubble center " << center << endl;
+        Info << "bubble center written to " << dataDir/dataFile << endl;
     }
     Info<< "\nEnd" << endl;
 
