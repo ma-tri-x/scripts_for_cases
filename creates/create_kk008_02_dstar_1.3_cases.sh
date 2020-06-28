@@ -14,7 +14,11 @@ get_dstar ()
 
 # ../noWallRefine_dstar_0.4 \
 study_cases=" \
-../noWallRefine_dstar_0.42 \
+../noWallRefine_dstar_1.29 \
+../noWallRefine_dstar_1.30 \
+../noWallRefine_dstar_1.31 \
+../noWallRefine_dstar_1.32 \
+../noWallRefine_dstar_1.33 \
 "
 
 for i in $study_cases;do
