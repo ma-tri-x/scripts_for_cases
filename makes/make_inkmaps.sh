@@ -18,21 +18,28 @@ dstar_cases=" \
 ../dstar_1.6 \
 ../dstar_1.8 \
 "
+dstar_cases=" \
+../noWallRefine_dstar_1.29 \
+../noWallRefine_dstar_1.30 \
+../noWallRefine_dstar_1.31 \
+../noWallRefine_dstar_1.32 \
+../noWallRefine_dstar_1.33 \
+"
 
 for i in $dstar_cases;do
     echo $i
     cp $thisdir/render_inkmaps.py $i
     cp $thisdir/states/inkmap_axisymm*.pvsm* $i/states/
     cd $i
-    sed -i "s/D\*=/D\*=$(get_dstar $i)/g" states/inkmap_axisymm_lagrangianInk_vorticity_withText_for_manual_edit_V2.pvsm
-    sed -i "s/dstar_0.2/${i#../}/g" states/inkmap_axisymm_lagrangianInk_vorticity_withText_for_manual_edit_V2.pvsm
-    echo "python render_inkmaps.py ## python API just sucks. It's almost cool. But only almost. That's why we do it manually"
+    #statefile=states/inkmap_axisymm_lagrangianInk_vorticity_withText_for_manual_edit_V2.pvsm
+    statefile=states/inkmap_axisymm_lagrangianInk_vorticity_withText_for_manual_edit_V3_zoom.pvsm
+    sed -i "s/D\*=/D\*=$(get_dstar $i)/g" $statefile
+    sed -i "s/dstar_0.2/${i#../}/g" $statefile
+    echo "python render_inkmaps.py ## \
+          python API just sucks. It's almost cool. \
+          But only almost. That's why we do it manually"
     paraFoam
-    if [ ! -e ${i#../}.png ];then echo "please save screenshot as ${i#../}.png !!"; exit 1;fi
-    cp ${i#../}.png $thisdir/final_inkmap_${i#"../"}.png
-    if [ $i == "../dstar_0.4" ];then
-        cp ${i#../}_500mu.png $thisdir/final_inkmap_${i#"../"}_500mu.png
-    fi
+    cp *.png $thisdir
     cd $thisdir
     #exit 0
 done
