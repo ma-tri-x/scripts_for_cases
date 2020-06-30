@@ -62,12 +62,12 @@ fire ()
 # "
 
 study_cases=" \
-../sp_conv_study_3mum_XF100 \
-../sp_conv_study_2mum_XF100 \
-../sp_conv_study_1.35mum_XF100 \
-../sp_conv_study_1mum_XF100 \
-../sp_conv_study_0.6mum_XF100 \
-../sp_conv_study_0.4mum_XF100 \
+../sp_conv_study_3mum_XF100_pVgamma \
+../sp_conv_study_2mum_XF100_pVgamma \
+../sp_conv_study_1.35mum_XF100_pVgamma \
+../sp_conv_study_1mum_XF100_pVgamma \
+../sp_conv_study_0.6mum_XF100_pVgamma \
+../sp_conv_study_0.4mum_XF100_pVgamma \
 "
 
 for i in $study_cases;do

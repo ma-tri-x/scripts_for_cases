@@ -173,6 +173,15 @@ study_cases11=" \
 ../conv_study_0.75mum_unbound_refine_low_res_XF100 \
 "
 
+study_cases12=" \
+../sp_conv_study_3mum_XF100_pVgamma \
+../sp_conv_study_2mum_XF100_pVgamma \
+../sp_conv_study_1.35mum_XF100_pVgamma \
+../sp_conv_study_1mum_XF100_pVgamma \
+../sp_conv_study_0.6mum_XF100_pVgamma \
+../sp_conv_study_0.4mum_XF100_pVgamma \
+"
+
 echo "" > Tc_spherical.dat
 echo "" > Tc_unbound.dat
 echo "" > Tc_unbound_int3cells.dat
@@ -184,6 +193,7 @@ echo "" > Tc_spherical_int3cells_CLmesh.dat
 echo "" > Tc_spherical_CLmesh.dat
 echo "" > Tc_spherical_XF100.dat
 echo "" > Tc_unbound_refine_low_res_XF100.dat
+echo "" > Tc_spherical_XF100_pVgamma.dat
 
 make_Tc_dat $study_cases1  -f=Tc_spherical.dat
 make_Tc_dat $study_cases2  -f=Tc_unbound.dat
@@ -196,6 +206,7 @@ make_Tc_dat $study_cases8  -f=Tc_spherical_int3cells_CLmesh.dat
 make_Tc_dat $study_cases9  -f=Tc_spherical_CLmesh.dat
 make_Tc_dat $study_cases10 -f=Tc_spherical_XF100.dat
 make_Tc_dat $study_cases11 -f=Tc_unbound_refine_low_res_XF100.dat
+make_Tc_dat $study_cases12 -f=Tc_unbound_refine_low_res_XF100_pVgamma.dat
 
 cp $plotfile.backup $plotfile
 # sed -i "s/SETTINGS/set xrange \[0.1:\*\]\nset yrange \[\*:\*\]\nset logscale x\nset xtics out (0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,2,3) rotate by -45/g" $plotfile
@@ -389,4 +400,28 @@ gnuplot $plotfile
 mv Tc.eps Tc_spherical_and_unbound_refine.eps
 epstopdf Tc_spherical_and_unbound_refine.eps
 pdfcrop Tc_spherical_and_unbound_refine.pdf Tc_spherical_and_unbound_refine.pdf
+rm *.eps
+
+
+
+
+
+
+
+
+cp $plotfile.backup $plotfile
+# sed -i "s/SETTINGS/set xrange \[0.1:\*\]\nset yrange \[\*:\*\]\nset logscale x\nset xtics out (0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,2,3) rotate by -45/g" $plotfile
+sed -i "s/SETTINGS/set xrange \[0.08:\*\]\nset yrange \[\*:\*\]\nset logscale x/g" $plotfile
+#sed -i "s/SETTINGS/set xrange \[0.005:\*\]\nset yrange \[\*:\*\]/g" $plotfile
+
+append_files_to_gnuplot_script Tc_spherical_XF100.dat "converged spherical calc." ",\\" "lc 7"
+append_files_to_gnuplot_script Tc_unbound.dat "axisymm. polar mesh" ",\\" "lc 2"
+append_files_to_gnuplot_script Tc_spherical_XF100_pVgamma.dat "spherical with adiabatic adjustment" " "
+
+
+
+gnuplot $plotfile
+mv Tc.eps Tc_spherical_and_unbound_pVgamma.eps
+epstopdf Tc_spherical_and_unbound_pVgamma.eps
+pdfcrop Tc_spherical_and_unbound_pVgamma.pdf Tc_spherical_and_unbound_pVgamma.pdf
 rm *.eps

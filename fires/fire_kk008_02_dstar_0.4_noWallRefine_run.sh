@@ -24,8 +24,11 @@ fire ()
 # ../dstar_1.6 \
 # ../dstar_1.8 \
 # ../noWallRefine_dstar_0.4 \
+# dstar_cases=" \
+# ../noWallRefine_dstar_0.42 \
+# "
 dstar_cases=" \
-../noWallRefine_dstar_0.42 \
+../noWallRefine_dstar_0.4_tTransitStart90mus \
 "
 
 for dstar in $dstar_cases;do

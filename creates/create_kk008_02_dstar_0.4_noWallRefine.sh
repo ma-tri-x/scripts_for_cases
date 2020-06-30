@@ -9,12 +9,12 @@ get_dx ()
 
 get_dstar ()
 {
-    echo "$(python <<< "print(\"${1}\".split(\"_\")[-1])")"
+    echo "$(python <<< "print((\"${1}\".split(\"dstar_\")[-1]).split(\"_\")[0])")"
 }
 
 # ../noWallRefine_dstar_0.4 \
 study_cases=" \
-../noWallRefine_dstar_0.42 \
+../noWallRefine_dstar_0.4_tTransitStart90mus \
 "
 
 for i in $study_cases;do
@@ -32,11 +32,14 @@ for i in $study_cases;do
     bash cp_toNewProject.sh $i
     echo "max cellSize: $cellSize"
     cd $i
+    rm -f 0/*
     sed -i "s/\"D_init\".*,/\"D_init\": ${dinit},/g" conf_dict.json
     sed -i "s/\"cellSize\".*: .*,/\"cellSize\" : ${cellSize},/g" conf_dict.json
     sed -i "s/\"maxCo\".*: .*,/\"maxCo\" : 0.2,/g" conf_dict.json
     sed -i "s/\"maxAlphaCo\".*: .*,/\"maxAlphaCo\" : 0.2,/g" conf_dict.json
-    sed -i "s/\"tTransitStart\".*: .*,/\"tTransitStart\" : 60e-6,/g" conf_dict.json
+    ##
+    #sed -i "s/\"tTransitStart\".*: .*,/\"tTransitStart\" : 60e-6,/g" conf_dict.json
+    ##
     sed -i "s/\"endTime\".*,/\"endTime\": 550e-6,/g" conf_dict.json
     sed -i "s/\"writeInterval\".*,/\"writeInterval\": 80,/g" conf_dict.json
     sed -i "s/\"domainSizeFactorRmax\".*: .*,/\"domainSizeFactorRmax\" : 100,/g" conf_dict.json

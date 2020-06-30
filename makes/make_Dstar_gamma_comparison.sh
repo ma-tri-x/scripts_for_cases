@@ -2,6 +2,9 @@
 
 thisdir=$(pwd)
 
+args=$@
+n_args=$#
+
 get_dstar ()
 {
     echo "$(python <<< "print(\"${1}\".split(\"_\")[-1])")"
@@ -13,7 +16,8 @@ read linear
 echo "re-make Rmax_ydist_of_dstar.dat? [y/n]"
 read remake
 
-
+if [ $n_args == 0 ]
+then
 study_cases=" \
 ../dstar_0.2 \
 ../noWallRefine_dstar_0.4 \
@@ -26,6 +30,9 @@ study_cases=" \
 ../dstar_1.6 \
 ../dstar_1.8 \
 "
+else
+study_cases=$args
+fi
 outfile=Rmax_ydist_of_dstar.dat
 
 if [ $remake == "y" ]
@@ -88,3 +95,5 @@ fi
 epstopdf Dstar_gamma_comparison.eps
 pdfcrop Dstar_gamma_comparison.pdf Dstar_gamma_comparison_$method.pdf
 rm Dstar_gamma_comparison.eps Dstar_gamma_comparison.pdf
+
+evince Dstar_gamma_comparison_$method.pdf
