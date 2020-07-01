@@ -12,10 +12,10 @@ epstopdf fabians_diagramm.eps
 pdfcrop fabians_diagramm.pdf fabians_diagramm_raw.pdf
 rm fabians_diagramm.eps fabians_diagramm.pdf
 
-echo "execute make_Dstar_gamma_comparison.sh, too? [y/n]"
-read comparison
-if [ $comparison == "y" ]
-then
+echo "execute make_Dstar_gamma_comparison.sh, too? [y/n] No choice, you must!"
+#read comparison
+#if [ $comparison == "y" ]
+#then
     echo "data points boxBubble or sphere init data? [b/s]"
     read boxBubble
     if [ $boxBubble == "b" ]
@@ -51,30 +51,35 @@ then
         "
     fi
     bash make_Dstar_gamma_comparison.sh $study_cases
-fi
+#fi
     
 
 echo "using first line of Rmax_ydist_of_dstar.dat to select formula"
-formula=$(head -n 1 Rmax_ydist_of_dstar.dat | sed "s/#//g")
+formula="$(cat formula.info)" 
+formula_name=$(head -n 1 Rmax_ydist_of_dstar.dat | sed "s/#//g")
 
 cp $plotfile.backup $plotfile
+sed -i "s/#FUNC/dstar_to_gamma(x)=$formula/g" $plotfile
+sed -i "s/p \[0:4\]/p \[0:2\]/g" $plotfile
+# cat $plotfile
+# exit 0
 
-if [ $formula == "Rmaxv_ydistc10e-6" ]
-then
-    sed -i "s/#FUNC/dstar_to_gamma(x)=0.689681\*x\*\*1.28703+0.362228/g" $plotfile
-elif [ $formula == "Rmaxv_ydistd" ]
-then
-    sed -i "s/#FUNC/dstar_to_gamma(x)=1.01247\*x+0.00918621/g" $plotfile
-else
-    echo "ERROR: formula not implemented"
-    exit 1
-fi
+# if [ $formula == "Rmaxv_ydistc10e-6" ]
+# then
+#     sed -i "s/#FUNC/dstar_to_gamma(x)=0.689681\*x\*\*1.28703+0.362228/g" $plotfile
+# elif [ $formula == "Rmaxv_ydistd" ]
+# then
+#     sed -i "s/#FUNC/dstar_to_gamma(x)=1.01247\*x+0.00918621/g" $plotfile
+# else
+#     echo "ERROR: formula not implemented"
+#     exit 1
+# fi
 
-outfile=fabians_diagramm_${formula}_$boxBubble.pdf
-opts="w p lc 4 pt 6 ps 3"
+outfile=fabians_diagramm_${formula_name}_$boxBubble.pdf
+opts="w p lc 1 lw 3 pt 6 ps 3"
 if [ $boxBubble == "b" ]
 then
-    opts="w p lc 8 pt 4 ps 3"
+    opts="w p lc 8 lw 3 pt 4 ps 3"
     datafile=vortices_simulated_kk008.dat
 elif [ $boxBubble == "s" ]
 then

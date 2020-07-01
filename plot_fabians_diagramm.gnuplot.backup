@@ -3,11 +3,13 @@ reset
 set term postscript eps color enhanced solid font "DejaVuSerif, 18"
 set output "fabians_diagramm.eps"
 
-set grid
+set grid xtics mxtics lw 2, lw 1
 unset ytics
+set mxtics 5
+set xtics out
 
 set ylabel "type of vortex generated"
-set xlabel "{/Symbol g}"
+set xlabel "{/Symbol g}_d"
 
 set yrange [-0.5:1.5]
 
