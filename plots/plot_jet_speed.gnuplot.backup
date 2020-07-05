@@ -1,0 +1,42 @@
+#!/bin/gnuplot
+
+reset
+# set term wxt
+# set output
+set term postscript eps color enhanced solid font "DejaVuSerif, 24"
+set output "jet_speed.eps"
+
+set grid
+set key  #KEYOPTS
+set multiplot
+set xrange[MAINXRANGE]
+
+set xlabel "t [{/Symbol m}s]"
+#set ylabel "min({/Symbol a}_1^.U_y) [m/s]"
+set ylabel "{/Italic v_j} [m/s]"
+
+#ARROWS
+
+plot \
+PLOT 
+    
+#UNCOMMENTFORINSETunset xlabel
+#UNCOMMENTFORINSETunset ylabel
+#UNCOMMENTFORINSETunset key
+#UNCOMMENTFORINSETset grid
+#UNCOMMENTFORINSET# clear
+#UNCOMMENTFORINSETset origin .15,.2
+#UNCOMMENTFORINSETset size .4,.4
+#UNCOMMENTFORINSETset tics out
+#UNCOMMENTFORINSETset xtics INSETXTICS font ",18"
+#UNCOMMENTFORINSETset ytics 20
+#UNCOMMENTFORINSET#set bmargin 0
+#UNCOMMENTFORINSET#set tmargin 1
+#UNCOMMENTFORINSET#set lmargin 1
+#UNCOMMENTFORINSET#set rmargin 1
+#UNCOMMENTFORINSETset xrange [INSETRANGE]
+#UNCOMMENTFORINSETset object 1 rect from 90.5,-200 to 105,-70
+#UNCOMMENTFORINSETset object 1 rect fc rgb 'white' fillstyle solid 0.0 noborder
+#UNCOMMENTFORINSETreplot
+    
+unset multiplot
