@@ -1,0 +1,35 @@
+reset
+set term postscript eps color enhanced solid font "DejaVuSerif, 16" size 18cm,18cm
+set output "pressure_sb.eps"
+#set term wxt
+#set output
+
+set colorsequence default # podo | default
+set linetype cycle 20
+set linetype 5 lc rgb '#00EE00' 
+#set linetype 8 lc rgb '#af739a'
+
+set grid
+set key top center
+set xtics 4 mirror
+set ytics 
+#set y2tics
+# set format x ''
+set format y ''
+#set format y2 ''
+
+#set xlabel "time [{/Symbol m}s]"
+#set ylabel "p [MPa]"
+set yrange[1:YRANGE]
+set logscale y
+set xrange[97:115]
+set label "10" at 98,10
+set label "100" at 98,100
+set label "1000" at 98,800
+
+
+set rmargin 1
+set tmargin 1
+set lmargin 1
+set bmargin 2
+set multiplot layout 3,3 

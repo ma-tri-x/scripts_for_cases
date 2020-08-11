@@ -2,9 +2,7 @@
 
 a_date=$(date)
 
-python rerun.py
-
-bash Allrun
+python rerun.py && bash Allrun
 # 
 b_date=$(date)
 # 

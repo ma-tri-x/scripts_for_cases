@@ -4,6 +4,23 @@ import json
 import shutil
 import re
 
+def check_prerequisites():
+    lines=[]
+    helper_scripts=[]
+    with open("Allrun.template","r") as f:
+        lines = f.readlines()
+    for i in lines:
+        if ".py " in i:
+            for j in i.split(" "):
+                if ".py" in j: helper_scripts.append(j)
+    for i in helper_scripts:
+        if not os.path.isfile(i):
+            try:
+                shutil.copy2("scripts_repo/{}s/{}".format(i.split("_")[0],i),".")
+            except(IOError):
+                print("ERROR: cannot find {}".format(i))
+                exit(1)
+
 def load_configuration(filename):
     #return json.load(open("case_conf.json"))
     return json.load(open(filename))
@@ -64,6 +81,8 @@ def find_and_replace_variables_in_copied_templates(tree_less, conf_dict):
             f.write(content)
 
 def main():
+    check_prerequisites()
+    
     conf_dict = load_configuration("conf_dict.json")
     
     tree1 = only_keep_template_paths(os.listdir('.'))
