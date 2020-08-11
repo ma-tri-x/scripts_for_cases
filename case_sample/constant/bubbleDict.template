@@ -1,0 +1,22 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  X.X-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      bubbleDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+Rmax              Rmax   [0 1 0 0 0 0 0] _BUBBLE-RMAX;
+Rstart            Rstart [0 1 0 0 0 0 0] _BUBBLE-RSTART;
+theta             theta  [0 0 0 0 0 0 0] THETHETA;
+boundaryDistance   boundaryDistance  [0 1 0 0 0 0 0] THEBCDISTANCE;
+meshDims          _MESH-MESHDIMS;

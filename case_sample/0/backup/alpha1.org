@@ -1,0 +1,116 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      alpha1;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    front
+    {
+      type      wedge;
+    }
+    
+    back
+    {
+      type      wedge;
+    }
+    
+    top
+    {
+      type      wedge;
+    }
+    
+    bottom
+    {
+      type      wedge;
+    }
+    
+    side
+    {
+      type      zeroGradient;
+    }
+    
+    upside
+    {
+      type      zeroGradient;
+    }
+    
+    downside
+    {
+      type      zeroGradient;
+    }
+    
+    axis
+    {
+      type      empty;
+    }
+
+     box1x1x1_region0
+     {
+       type       fixedValue;
+        value      uniform 1;
+     }
+     
+    wall
+    {
+//         type       zeroGradient;
+        type       fixedValue;
+        value      uniform 1;
+    }  
+    wall2
+    {
+//         type       zeroGradient;
+        type       empty;
+    }
+    
+    top_
+    {
+      type      zeroGradient;
+    }
+    
+    bottom_
+    {
+        type       zeroGradient;
+    }
+     
+    wall_in
+    {
+        type   zeroGradient;
+    }
+    
+    top_out
+    {
+        type   zeroGradient;
+    }
+
+    frontandback_pos
+    {
+      type      wedge;
+    }
+    frontandback_neg
+    {
+      type      wedge;
+    }
+    frontandback
+    {
+      type      empty;
+    }
+
+}
+
+// ************************************************************************* //
