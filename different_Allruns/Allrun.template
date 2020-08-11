@@ -293,12 +293,7 @@ then
                         -time $time -keepPatches >> log.setFields  #-condition 'pos().x <= 50e-6' 
         funkySetFields -case . -field alpha1 -expression "0"\
                         -time $time -keepPatches -condition "pos().x <= ${cyl_rad} && pos().y <= ${cyl_h}/2. + $offset && pos().y >= $offset - ${cyl_h}/2."  >> log.setFields  #
-    else
-        funkySetFields -case . -field alpha1 -expression "0.5*(tanh(($radial_distance-${R})*5.9/${width})+1)"\
-                        -time $time -keepPatches >> log.setFields  #-condition 'pos().x <= 50e-6' 
-    fi
-
-    if [ "_BUBBLE-BOXBUBBLE" = "true" ];then
+    elif [ "_BUBBLE-BOXBUBBLE" = "true" ];then
         if [ "_MESH-MESHDIMS" = "3D" ];then
             blhalf=$(m4 <<< "esyscmd(perl -e 'printf ( $boxEdgeLength_true / 2. )')") 
             funkySetFields -case . -field alpha1 -expression "1.0" -time $time -keepPatches >> log.setFields
@@ -375,6 +370,7 @@ then
             echo "pBubble          = $pBubble "
             echo "Ebubble          = $Ebubble "
         elif [ _BUBBLE-METHOD = "adiabatic" ]
+        then
             R=$(m4 <<< "esyscmd(perl -e 'printf (   (${true_alpha2_vol}/(4.*${pi})*3)**(1./3.)  )')")
             pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   ${pn}*((${Rn}**3. - ${beta}*${Rn}**3.)/(${R}**3. - ${beta}*${Rn}**3.))**${gamma}  )')")
             echo "R                = $R       "
