@@ -16,8 +16,12 @@ rsync -v Allr* scripts_repo/different_Allruns/
 rsync -v constant/polyMesh/*.m4.template scripts_repo/meshes/
 rsync -v states/* scripts_repo/states/
 rsync -v system scripts_repo/system
-rsync -v merge*py scripts_repo/
-rsync -v *.backup scripts_repo/
+rsync -v merge*py scripts_repo/Scripts_Python/
+if [ -e *.backup ]
+then
+    echo "copying some *.backup to scripts_repo. \nPlease sort them afterwards into folders"
+    rsync -v *.backup scripts_repo/
+fi
 rsync -v calc*py scripts_repo/calcs/
 rsync -v check*py scripts_repo/checks/
 rsync -v *.json scripts_repo/jsons/
@@ -40,8 +44,13 @@ rm -f temp_rsync/check*py
 rm -f temp_rsync/render*
 rm -f temp_rsync/prepare*
 rm -f temp_rsync/produce*
-echo "leftovers: $(ls temp_rsync)"
-rsync -v temp_rsync/* scripts_repo/
+leftovers="$(ls temp_rsync)"
+if [ $leftovers ]
+then
+    echo "leftovers: $leftovers"
+    rsync -v temp_rsync/* scripts_repo/
+    echo "sort the leftovers in scripts_repo!!"
+fi
 rm -r temp_rsync
 
 
