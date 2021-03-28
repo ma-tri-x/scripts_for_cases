@@ -8,6 +8,11 @@ The minimum amount of scripts to run a case are included in the folders
 "case_sample" and
 "Scripts_MinimumPerCase".
 # Usage for getting started
+Make shure that the foam-extend variables of your installation are sourced, e.g.:
+```
+source ~/foam/foam-extend-4.0/etc/bashrc
+```
+then do
 ```
 case_dir=$WM_PROJECT_USER_DIR/01_cavitation_bubble_case
 mkdir -p $case_dir
