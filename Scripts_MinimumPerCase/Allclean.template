@@ -10,14 +10,15 @@ fi
 # echo "backing up timestep 6.579821935e-05"
 # cp -r 6.579821935e-05 0/backup
 
-foamCleanTutorials cases
+#foamCleanTutorials cases
+rm -rf 0/uniform
 rm -rf processor*
 rm -rf sets/
 if [ "_MESH-EXECUTEBLOCKMESH" = "true" ];then
-    rm -rf 0/p_rgh 0/alpha1 0/U
-    rm -rf 0/*.gz
+    rm -f 0/p_rgh 0/U 0/alpha* 0/Alpha* 0/rho*
+    rm -f 0/*.gz
     rm -rf 0/uniform
-    rm -rf log.*
+    rm -f log.*
     rm -f constant/polyMesh/*.gz
     rm -f constant/polyMesh/boundary
 fi
