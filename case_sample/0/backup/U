@@ -1,0 +1,131 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+
+    front
+    {
+      type      wedge;
+    }
+    
+    back
+    {
+      type      wedge;
+    }
+    
+    top
+    {       
+        type      wedge;
+    }
+    
+    bottom
+    {
+        type      wedge;
+    }
+    
+    side
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform ( 0 0 0 );
+    }
+    
+    upside
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform ( 0 0 0 );
+    }
+    
+    downside
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform ( 0 0 0 );
+    }
+    
+    top_
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform ( 0 0 0 );
+    }
+    
+    rim
+    {
+        type      wedge;
+    }
+    
+    axis
+    {
+      type      empty;
+    }
+
+    box1x1x1_region0
+    {
+        type    fixedValue;
+        value   uniform (0 0 0);
+    }
+    
+    wall
+    {
+        type    fixedValue;
+        value   uniform (0 0 0);
+//         type slip;
+    }
+    wall2
+    {
+        type       empty;
+//         type slip;
+    }
+    
+    bottom_
+    {
+        //type    fixedValue;
+        //value   uniform (0 0 0);
+        type slip;
+    }
+     
+    wall_in
+    {
+        type inletOutlet;
+        inletValue uniform (0 1.0 0);
+    }
+    
+    top_out
+    {
+        type            outletInlet;
+        outletValue   uniform (0 1.0 0);
+    }
+    
+
+    frontandback_pos
+    {
+      type      wedge;
+    }
+    frontandback_neg
+    {
+      type      wedge;
+    }
+    frontandback
+    {
+      type      empty;
+    }
+
+}
+
+// ************************************************************************* //

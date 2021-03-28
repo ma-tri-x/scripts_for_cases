@@ -1,0 +1,26 @@
+#!/bin/gnuplot
+
+reset
+#set term wxt
+#set output
+
+set term postscript eps color enhanced solid font "DejaVuSerif, 20"
+set output "sigma_comparison.eps"
+
+set grid
+set key above
+set xlabel "x [{/Symbol m}m]"
+set ylabel "y [{/Symbol m}m]"
+
+set xtics autofreq 200
+set ytics autofreq 200
+
+set xrange [-500:500]
+set yrange [-400:500]
+
+set size ratio -1
+
+set datafile separator ","
+
+plot "temp/sigma_piston.dat" u 1:2 w l lc 7 lw 3 t "no sigma",\
+"temp/sigma_piston.dat" u 1:2 w l lc 2 lw 3 t "with sigma",\

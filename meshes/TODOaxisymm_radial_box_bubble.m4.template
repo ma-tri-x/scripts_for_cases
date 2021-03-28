@@ -1,0 +1,201 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+  
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * *NOT COMPLETED!!!!* * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * 2020-05-02 Max Koch axisymm radial to be used with  * * * * //
+// * * * * * * * * * * * * * * * stitchMesh and* * * * * *makeAxialMesh!°* * //
+// * * * * * * * * * * * * and make bubble a box of Vol (4pi/3 R^3)  * * !!! //
+// * * * * making use of all cool macros gained so far * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'use Math::Trig; use Math::Round; printf ($1)')])
+define(get_cell_amount, [esyscmd(python calc_n_by_grading.py $1 $2 $3)])
+define(PI, 3.14159265358979323846264338327950288)
+
+//# Origin for GCOi functions:
+define(Ox, 0.)
+define(Oy, 0.)
+define(Oz, 0.)
+//# define function to get circle point coordinates when having origin in (0 0 0)
+//# GCP = getCirclePoint
+//# GCPx = R * cos(phi [deg]) * cos(theta [rad]
+define(GCOx, [calc(($1)*cos( ($2)/180.*PI ) *cos(($3)/180.*PI) + Ox)])
+define(GCOy, [calc(($1)*sin( ($2)/180.*PI ) + Oy)])
+define(GCOz, [calc(($1)*cos( ($2)/180.*PI ) *sin(($3)/180.*PI) + Oz)])
+define(GCO, [GCOx($1,$2,$3) GCOy($1,$2,$3) GCOz($1,$2,$3)])
+
+//# faces for hex when starting in the northeast corner with vert 1
+define(hexsouth, [($3 $4 $8 $7)])
+define(hexwest,  [($3 $2 $6 $7)])
+define(hexeast,  [($1 $5 $8 $4)])
+define(hexnorth, [($1 $2 $6 $5)]) 
+define(hexup,    [($7 $8 $5 $6)]) 
+define(hexdown,  [($1 $4 $3 $2)]) 
+
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+
+
+
+//# parameters that drive the mesh:
+define(Rstart, _BUBBLE-RSTART)
+define(x, Rstart)                     // bubble domain (domain A_b)
+define(Rmax, _BUBBLE-RMAX)
+define(X, calc(_MESH-FACTORBUBBLEDOMAINRMAX * Rmax))                     // bubble domain im (domain B)
+define(XF,calc(_MESH-DOMAINSIZEFACTORRMAX * Rmax))              // mesh end (domain C)
+define(cellsize, _MESH-CELLSIZE)
+define(grading_factor,_MESH-GRADINGFACTOR)
+
+//# derived:
+define(zex,calc(XF*atan(2./180.*PI))) //# z-extension for theta=2degrees
+
+
+//################### domain A,B
+define(NUMX, calc(round(X/cellsize)))
+define(NUMx, calc(round(x/cellsize)))
+define(NUMX, calc(round(NUMX-NUMx)+NUMx))
+define(NUMY, calc(2*NUMX))
+//# cell width at x=Xi
+define(cw_X, cellsize)
+//################### domain D
+//# same for domain D
+define(l_D, calc(XF-X)) 
+define(Dgrd,calc(grading_factor*XF/X)) 
+//
+define(Dnum, get_cell_amount(Dgrd,l_D,cw_X))
+define(cw_XF, calc(cw_X*Dgrd))
+
+//# n=north, e=east, w=west, s=south, d/u=down/up
+vertices
+(
+    (  x -x -zex)      vlabel(Aedn)
+    (  0 -x -zex)      vlabel(Awdn)
+    (  0 -x  zex)      vlabel(Awds)
+    (  x -x  zex)      vlabel(Aeds)
+    
+    (  x  x -zex)      vlabel(Aeun)
+    (  0  x -zex)      vlabel(Awun)
+    (  0  x  zex)      vlabel(Awus)
+    (  x  x  zex)      vlabel(Aeus)
+
+    (  0  X -zex)      vlabel(BWUwun)
+    (  0  X  zex)      vlabel(BWUwus)
+    (  x  X -zex)      vlabel(BWUeun)
+    (  x  X  zex)      vlabel(BWUeus)
+    
+    (  X  X -zex)      vlabel(BEUeun)
+    (  X  X  zex)      vlabel(BEUeus)
+    (  X  x -zex)      vlabel(BEUedn)
+    (  X  x  zex)      vlabel(BEUeds)
+
+    (  X -x -zex)      vlabel(BMedn)
+    (  X -x  zex)      vlabel(BMeds)
+    
+    (  X -X -zex)      vlabel(BEDedn)
+    (  X -X  zex)      vlabel(BEDeds)
+    (  x -X -zex)      vlabel(BEDwdn)
+    (  x -X  zex)      vlabel(BEDwds)
+    
+    (  0 -X -zex)      vlabel(BWDwdn)
+    (  0 -X  zex)      vlabel(BWDwds)
+    
+    (GCOx(XF,45.,-2.) GCOx(XF,45.,-2.) -zex)  vlabel(DUeun)
+    (  0  XF -zex)     vlabel(DUwun)
+    (  0  XF  zex)     vlabel(DUwus)
+    (GCOx(XF,45., 2.) GCOx(XF,45., 2.)  zex)  vlabel(DUeus)
+    
+    (GCOx(XF,-45.,-2.) GCOy(XF,-45.,-2.) -zex) vlabel(DMedn)
+    (GCOx(XF,-45., 2.) GCOy(XF,-45., 2.)  zex) vlabel(DMeds)
+    
+    (  0 -XF -zex)     vlabel(DDwdn)
+    (  0 -XF  zex)     vlabel(DDwds)
+);
+ 
+blocks
+( 
+  //#A
+  hex (edn wdn wds eds  eun wun wus eus)          (NUMx 1 NUMy)    simpleGrading (1 1 1)
+  //#DU
+  hex (eun wun wus eus  DUeun DUwun DUwus DUeus)  (NUMx 1 Dnum)    simpleGrading (1 1 Dgrd)
+  //#DM
+  hex (DMedn edn eds DMeds  DUeun eun eus DUeus)  (Dnum 1 NUMy)    simpleGrading (calc(1./Dgrd) 1 1)
+  //#DD
+  hex (DMedn DDwdn DDwds DMeds  edn wdn wds eds)  (NUMx 1 Dnum)    simpleGrading (1 1 calc(1./Dgrd))
+);
+
+
+edges                  
+(
+  arc DDwdn DMedn  (GCOx(XF,calc(-45-22.5),-2.) GCOy(XF,calc(-45-22.5),-2.) -zex)
+  arc DDwds DMeds  (GCOx(XF,calc(-45-22.5), 2.) GCOy(XF,calc(-45-22.5), 2.)  zex)
+  
+  arc DMedn DUeun  (GCO(XF,0, -2.))
+  arc DMeds DUeus  (GCO(XF,0,  2.))
+  
+  arc DUwun DUeun  (GCOx(XF,calc( 45+22.5),-2.) GCOy(XF,calc( 45+22.5),-2.) -zex)
+  arc DUwus DUeus  (GCOx(XF,calc( 45+22.5), 2.) GCOy(XF,calc( 45+22.5), 2.)  zex)
+);
+ 
+patches
+(
+     empty frontandback
+     (    
+        hexsouth(edn, wdn, wds, eds,  eun, wun, wus, eus) //#A
+        hexsouth(eun, wun, wus, eus,  DUeun, DUwun, DUwus, DUeus) //#DU
+        hexsouth(DMedn, edn, eds, DMeds,  DUeun, eun, eus, DUeus) //#DM
+        hexsouth(DMedn, DDwdn, DDwds, DMeds,  edn, wdn, wds, eds) //#DD
+        hexnorth(edn, wdn, wds, eds,  eun, wun, wus, eus) //#A
+        hexnorth(eun, wun, wus, eus,  DUeun, DUwun, DUwus, DUeus) //#DU
+        hexnorth(DMedn, edn, eds, DMeds,  DUeun, eun, eus, DUeus) //#DM
+        hexnorth(DMedn, DDwdn, DDwds, DMeds,  edn, wdn, wds, eds) //#DD
+     )
+     
+     patch side
+     (  
+        hexup(eun, wun, wus, eus,  DUeun, DUwun, DUwus, DUeus) //#DU
+        hexeast(DMedn, edn, eds, DMeds,  DUeun, eun, eus, DUeus) //#DM
+        hexdown(DMedn, DDwdn, DDwds, DMeds,  edn, wdn, wds, eds) //#DD
+     )
+     
+     empty axis
+     (
+        hexwest(edn, wdn, wds, eds,  eun, wun, wus, eus) //#A
+        hexwest(eun, wun, wus, eus,  DUeun, DUwun, DUwus, DUeus) //#DU
+        hexwest(DMedn, DDwdn, DDwds, DMeds,  edn, wdn, wds, eds) //#DD
+     )
+);   
+     
+
+mergePatchPairs
+(
+);
+

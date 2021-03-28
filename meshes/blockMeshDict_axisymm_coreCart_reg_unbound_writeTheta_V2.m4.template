@@ -23,8 +23,22 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-// * * * * * * * 2019-05-25 Max Koch cartesian core simple   * * * * * * * * //
-
+// * * * * * * * 2019-06-25 Max Koch cartesian core simple   * * * * * * * * //
+// * * * * * * * * *rt *_______ edge3,4* * * * * * * * * * * * * * * * * * * //
+// * * * * * * XF* * * | * * * O--_____*__ rt* * * * * * * * * * * * * * * * //
+// * * * * * * * * *rt |____ C2* * * * / *----___* * * * * * * * * * * * * * //
+// * * * * * * X * * * | * * __0_* * */* * * * * ---___*edge1,2* * * * * * * //
+// * * * * * * * * * * | * edge7,8---/--_* * * * * * * O-\ * * * * * * * * * //
+// * * * * * * * * * * | * * * * * */rt* ---_* *C1 * * * *\* * * * * * * * * //
+// * * * * * * * * * * | * B2*11,12/ * * * * ---O*edge5,6* \ * * * * * * * * //
+// * * * * * * * * *rt |____edge */* * * * * * * \ * * * * *|* * * * * * * * //
+// * * * * * * Xii * * |A3* O----/____ * * * * * *\* * * * *|  * * * * * * * //
+// * * * * * * * * *lt |_______*/*rt *\o edge 9,10 | * * * *|* * * * * * * * //
+// * * * * * * Xi* * * | * * * | rt* * \  B1 * * * | * * * *|* * * * * * * * //
+// * * * * * * * * * * | *A1 * | * A2* *|* * * * * | * * * *|* * * * * * * * //
+// * * * * * * * * * * |_______|________|__________|_______*|* * * * * * * * //
+// * * * * * * * * * *ld * * * rd* * * ld* * * * * rd* * * *rd * * * * * * * //
+// * * * * * * * * * * * * * * Xi* * * Xii * * * * X * * * *XF * * * * * * * //
 
 
 
@@ -55,11 +69,11 @@ convertToMeters 1;
 //# parameters that drive the mesh:
 define(Rmax, _BUBBLE-RMAX)
 define(Xi, _MESH-MESHCORESIZE)                   // core rim (domain A)
-define(Xii,calc(2.0*sqrt(2)*Xi))                     // core rim points radius
+define(Xii,calc(2*Xi))                     // core rim points radius
 define(X, calc(_MESH-FACTORBUBBLEDOMAINRMAX * Rmax))                     // bubble domain im (domain B)
 define(XF,calc(_MESH-DOMAINSIZEFACTORRMAX * Rmax))              // mesh end (domain C)
 define(cellsize, _MESH-CELLSIZE)
-define(grading_factor,_MESH-GRADINGFACTOR)
+define(gradingFactor, _MESH-GRADINGFACTOR)
 //#define(Bnum90deG, _MESH-NUMPER90DEG)      // angular number of cells in B domain
 
 
@@ -101,7 +115,7 @@ define(cw_X, calc(cw_Xii*Bgrd))
 //################### domain C
 //# same for domain C
 define(l_C, calc(XF-X)) 
-define(Cgrd,calc(grading_factor*XF/X)) 
+define(Cgrd,calc(gradingFactor*XF/X)) 
 //# we take double the size of the cell in C domain and half the amount of cells in angular direction
 define(cw_X_C, cw_X)
 //define(Cnum90deg, Bnum90deg)

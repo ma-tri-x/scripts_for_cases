@@ -1,0 +1,194 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p_rgh;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform 101315;
+
+boundaryField
+{
+
+    front
+    {
+      type      wedge;
+    }
+    
+    back
+    {
+      type      wedge;
+    }
+    
+    
+    top
+    {
+        type      wedge;    
+    }
+    
+    bottom
+    {
+        type      wedge;
+    }
+    
+    side
+    {
+        type            waveTransmissive;
+        field           p_rgh;
+        phi             phi;
+        rho             rho;
+//         psi           psim;
+        psi             DrhoDp;
+        fieldInf        101315;
+        gamma           1; //1.006580313;
+        lInf            10;//0.0034;//1e-3;
+        value           uniform 101315;
+        inletOutlet     true;
+        correctSupercritical false;
+    }
+    
+    _side
+    {
+        type bubbleWaveTransmissive;
+        field           p_rgh;
+        phi             phi;
+        rho             rho;
+        alpha           alpha1;
+//         psi           psim;
+        psi             DrhoDp;
+        fieldInf        101315;
+        gamma           1; //1.006580313;
+        lInf            1;//0.0034;//1e-3;
+        value           uniform 101315;
+        inletOutlet     true;
+        correctSupercritical false;
+        theta           1.0;
+    }
+    
+    upside
+    {
+        type            waveTransmissive;
+        field           p_rgh;
+        phi             phi;
+        rho             rho;
+//         psi           psim;
+        psi             DrhoDp;
+        fieldInf        101315;
+        gamma           1; //1.006580313;
+        lInf            10;//0.0034;//1e-3;
+        value           uniform 101315;
+        inletOutlet     true;
+        correctSupercritical true;
+    }
+    
+    top_
+    {
+        type            waveTransmissive;
+        field           p_rgh;
+        phi             phi;
+        rho             rho;
+//         psi           psim;
+        psi             DrhoDp;
+        fieldInf        101315;
+        gamma           1; //1.006580313;
+        lInf            10;//0.0034;//1e-3;
+        value           uniform 101315;
+        inletOutlet     true;
+        correctSupercritical true;
+    }
+    
+    downside
+    {
+        type            waveTransmissive;
+        field           p_rgh;
+        phi             phi;
+        rho             rho;
+//         psi           psim;
+        psi             DrhoDp;
+        fieldInf        101315;
+        gamma           1; //1.006580313;
+        lInf            10;//0.0034;//1e-3;
+        value           uniform 101315;
+        inletOutlet     true;
+        correctSupercritical true;
+    }
+   /*outflow
+   {
+       type            waveTransmissive;
+       value           uniform 80000;    //important for correct I/O
+       field           p;                //the name of the field that we are working on
+       gamma           1.4;              //the ratio of specific heats
+       phi             phiv;             //the name of the volumetric flux field ( or if you use the mass flux phi, it will be divided by rho)
+       rho             rho;              //the name of the density field
+       psi             psi;              //the name of the field that is the deriv. of density with respect to pressure
+       lInf            0.05;             //a measure of how far away the far-field condition should be
+       fieldInf        80000;            //the far-field value to be applied to p
+   }
+   The boundary condition performs some basic thermodynamic calculations and tries 
+   to do the following: create a tendency towards the fieldInf value while setting 
+   the instantaneous value to be someting as consistant as possible with the outgoing 
+   characteristics. The larger the value of lInf, the further the boundary condition 
+   will deviate from the value specified as fieldInf. However, the smaller the value 
+   of lInf, the more reflective the boundary tends to be.*/
+
+     axis
+     {
+         type      empty;
+     }
+
+     box1x1x1_region0
+     {
+         type       zeroGradient;
+     }
+     
+     wall
+     {
+         type       zeroGradient;
+     }
+     
+     wall2
+     {
+         type       empty;
+     }
+     
+     bottom_
+     {
+         type       zeroGradient;
+     }
+     
+    wall_in
+    {
+        type       zeroGradient;
+    }
+    
+    top_out
+    {
+        type       zeroGradient;
+    }
+
+    frontandback_pos
+    {
+      type      wedge;
+    }
+    frontandback_neg
+    {
+      type      wedge;
+    }
+    frontandback
+    {
+      type      empty;
+    }
+}
+
+// ************************************************************************* //

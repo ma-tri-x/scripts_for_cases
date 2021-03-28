@@ -1,0 +1,18 @@
+reset
+set term postscript eps color enhanced solid font "DejaVuSerif, 16"
+set output "stresses_sb.eps"
+
+set grid
+set key above
+
+set xlabel "D^*"
+set ylabel "p [MPa]"
+
+
+p \
+"stresses.dat" u 1:2 w lp ps 2 lw 3 t "average",\
+""             u 1:3 w lp ps 2 lw 3 t "peak"
+
+set output "stresses_sb_log.eps"
+set logscale y
+replot

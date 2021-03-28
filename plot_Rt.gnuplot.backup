@@ -1,0 +1,41 @@
+reset
+set term postscript eps color enhanced solid font "DejaVuSerif, 18"
+set output "Rt.eps"
+set grid
+set ylabel "equiv. radius [{/Symbol m}m]"
+set xlabel "t [{/Symbol m}s]"
+set key top right #outside tmargin
+set tics out
+
+set xrange [0:130]
+
+
+set multiplot
+
+unset title 
+
+plot \
+PLOT
+
+                 
+                 
+unset xlabel
+unset ylabel
+unset key
+unset grid
+# clear
+set origin .2,.2
+set size .5,.5
+set tics out
+set xtics INSETXTICS
+set ytics 40
+#set bmargin 0
+#set tmargin 1
+#set lmargin 1
+#set rmargin 1
+set xrange [INSETRANGE]
+set object 1 rect from 90.5,0 to 105,200
+set object 1 rect fc rgb 'white' fillstyle solid 0.0 noborder
+replot
+    
+unset multiplot

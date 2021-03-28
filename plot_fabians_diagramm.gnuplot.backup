@@ -1,0 +1,25 @@
+reset
+
+set term postscript eps color enhanced solid font "DejaVuSerif, 18"
+set output "fabians_diagramm.eps"
+
+set grid xtics mxtics lw 2, lw 1
+unset ytics
+set mxtics 5
+set xtics out
+
+set ylabel "type of vortex generated"
+set xlabel "{/Symbol g}_d"
+
+set yrange [-0.5:1.5]
+
+#FUNC
+
+p [0:4]\
+1 lc 7 t "",\
+0.5 lc 4 t "",\
+0 lc 3 t "",\
+"fabians_diagramm/fabians_data_free_vortex.dat" w lp lw 3 lc 7 t "free vortex",\
+"fabians_diagramm/fabians_data_no_vortex.dat"   w lp lw 3 lc 4 t "no vortex",\
+"fabians_diagramm/fabians_data_wall_vortex.dat" w lp lw 3 lc 3 t "wall vortex",\
+ADDPLOT

@@ -1,0 +1,53 @@
+#!/bin/gnuplot
+
+reset
+#set term wxt
+#set output
+set term postscript eps color enhanced solid font "DejaVuSerif, 20"
+set output "jet_speed.eps"
+
+unset grid
+set key above
+
+set xrange[93:110]
+
+set xlabel "t [{/Symbol m}s]"
+set ylabel "min(U_y) [m/s]"
+
+set arrow nohead from 93,-46.76  to 105.0,-46.76  lw 3 lc 8 dt 3
+set arrow nohead from 93,-64.6  to 102.5,-64.6    lw 3 lc 8 dt 3
+set arrow nohead from 93,-76.1  to 102.2,-76.1    lw 3 lc 8 dt 3
+set arrow nohead from 93,-83.8  to 102.3,-83.8    lw 3 lc 8 dt 3
+set arrow nohead from 93,-92.4  to 101.99,-92.4   lw 3 lc 8 dt 3
+set arrow nohead from 93,-105.9  to 100.5,-105.9  lw 3 lc 8 dt 3
+set arrow nohead from 93,-121.7 to 99.3,-121.7    lw 3 lc 8 dt 3     
+set arrow nohead from 93,-141.5 to 98.4,-141.5    lw 3 lc 8 dt 3     
+
+
+plot \
+"../noWallRefine_dstar_0.4/postProcessing/swakExpression_extremeUy/0/extremeUy" u (($1)*1e6):2 w l lw 5 lc 1 dt 1 t "0.4" ,\
+"../dstar_0.6/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 2 dt 3 t "0.6" ,\
+"../dstar_0.8/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 3 dt 1 t "0.8" ,\
+"../dstar_1.0/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 4 dt 1 t "1.0" ,\
+"../dstar_1.2/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 6 dt 1 t "1.2" ,\
+"../dstar_1.4/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 7 dt 1 t "1.4" ,\
+"../dstar_1.6/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 8 dt 1 t "1.6" ,\
+"../dstar_1.8/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 2 dt 1 t "1.8"
+
+
+set output "jet_speed_dstar_3.0.eps"
+unset arrow
+set arrow nohead from 93,-331.75 to 95.3875,-331.75    lw 3 lc 8 dt 3   
+p "../dstar_3.0/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 2 dt 1 t "3.0"
+
+
+set output "jet_speed_fast_jet.eps"
+unset arrow
+set arrow nohead from 109.25,-1200 to 109.25,0   lw 3 lc 8 dt 3     
+set arrow nohead from 109.34,-1200 to 109.34,0   lw 3 lc 8 dt 3     
+set arrow nohead from 109.34,-1200 to 109.34,0   lw 3 lc 8 dt 3     
+set xrange[109:110]
+set yrange[-1200:0]
+plot \
+"../dstar_0.0/postProcessing/swakExpression_extremeUy/0/extremeUy"              u (($1)*1e6):2 w l lw 5 lc 8 dt 1 t "0.0",\
+-986.119606928      w l lw 5 t "average"
