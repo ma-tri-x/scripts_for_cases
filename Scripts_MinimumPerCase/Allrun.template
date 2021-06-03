@@ -75,57 +75,30 @@ fi
 if [ "_MESH-REFINEMESH" = "true" ]
 then
     echo "prepare refining mesh..."
-    rm system/cellSetDict.?
-    rm system/cellSetDict.??
     #n0=_MESH-STARTCELLAMOUNT
     #csgoal=_MESH-CELLSIZEGOAL
     #size=_MESH-SIZE
-    if [ _REFINE-AUTOMATICREFINE = "true" ]
+    iterations=_REFINE-REFINETIMES #$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0**(1./3.))/$csgoal)/log(2.)) )')")
+    iterations=`expr $iterations + 1`
+    if [ $iterations -gt 13 ]
     then
-        iterations=_REFINE-REFINETIMES #$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0**(1./3.))/$csgoal)/log(2.)) )')")
-        iterations=`expr $iterations + 1`
-        if [ $iterations -gt 13 ]
-        then
-            echo "impossible number of iterations: $iterations > 10"
-            exit 1
-        fi
-        refineUntil=_REFINE-REFINEUNTIL
-        refineFrom=_REFINE-REFINEFROM
-        j=1
-        while [ $j -lt $iterations ] ; do
-            echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
-            cp system/cellSetDict.1.backup system/cellSetDict.$j
-            dinit=_BUBBLE-D_INIT
-            if [ $(python check_str_in_str.py "axisymm_radial" "_MESH-MESHFILE") ]
-            then
-                dinit=0.0
-            fi
-            sed -i "s/dinit/${dinit}/g" system/cellSetDict.$j
-            refDist=$(m4 <<< "esyscmd(perl -e 'printf (  (${refineUntil} - ${refineFrom} )*(($j - $iterations )/( $iterations -1.))**2 +$refineFrom )')")
-            sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
-    #         refDist=$(m4 <<< "esyscmd(perl -e 'printf ( $refDist - $distOfRefineStep  )')")
-            j=`expr $j + 1`
-        done
-    else
-        refDistsInRmax=_REFINE-REFDISTSINRMAX
-        j=1
-        for refDistRmax in $refDistsInRmax;do
-            echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
-            cp system/cellSetDict.1.backup system/cellSetDict.$j
-            dinit=_BUBBLE-D_INIT
-            if [ $(python check_str_in_str.py "axisymm_radial" "_MESH-MESHFILE") ]
-            then
-                dinit=0.0
-            fi
-            sed -i "s/dinit/${dinit}/g" system/cellSetDict.$j
-            refDist=$(m4 <<< "esyscmd(perl -e 'printf (  $refDistRmax * _BUBBLE-RMAX )')")
-            sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
-            if [[ $j == _REFINE-ADDBOXTOCELLSETDICTNUMBER ]];then
-                sed -i "s#//  boxToCell#boxToCell#g" system/cellSetDict.$j
-            fi
-            j=`expr $j + 1`
-        done
+        echo "impossible number of iterations: $iterations > 10"
+        exit 1
     fi
+    refineUntil=_MESH-REFINEUNTIL
+    #distOfRefineStep=$(m4 <<< "esyscmd(perl -e 'printf (  $refineUntil/$iterations )')")
+    #echo "distOfRefineStep = $distOfRefineStep"
+    #refDist=$refineUntil
+    j=1
+    while [ $j -lt $iterations ] ; do
+        echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
+        cp system/cellSetDict.1.backup system/cellSetDict.$j
+        sed -i "s/dinit/_BUBBLE-D_INIT/g" system/cellSetDict.$j
+        refDist=$(m4 <<< "esyscmd(perl -e 'printf (  $refineUntil/(1.-$iterations)**2 * ($j - $iterations)**2)')")
+        sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
+#         refDist=$(m4 <<< "esyscmd(perl -e 'printf ( $refDist - $distOfRefineStep  )')")
+        j=`expr $j + 1`
+    done
     j=1
     while [ -e system/cellSetDict.$j ] ; do
         echo "refining step $j..."
@@ -147,14 +120,11 @@ then
     makeAxialMesh -wedge frontandback -wedgeAngle 4 -axis axis > log.makeAxialMesh
     echo "collapsingEdges ..."
     collapseEdges 1e-8 180 -overwrite > log.collapseEdges
-    if [ -d 0/polyMesh ]
-    then
-        cp 0/polyMesh/* constant/polyMesh/ # <-important bec otherwise decomposePar wont write processor*/0 folders
-        sed -i "s/symmetryPlane/empty/g" 0/polyMesh/boundary
-        rm -rf 0/polyMesh # <-important bec otherwise decomposePar wont write processor*/0 folders
-    fi
+    cp 0/polyMesh/* constant/polyMesh/ # <-important bec otherwise decomposePar wont write processor*/0 folders
+    rm -rf 0/polyMesh # <-important bec otherwise decomposePar wont write processor*/0 folders
     checkMesh > log.checkMesh
     sed -i "s/symmetryPlane/empty/g" constant/polyMesh/boundary
+    sed -i "s/symmetryPlane/empty/g" 0/polyMesh/boundary
     echo $(grep -E "Zero|zero|skew|Skew" log.checkMesh)
 #     exit 0
 fi
@@ -265,16 +235,12 @@ then
     offset=_BUBBLE-D_INIT
     if [ "_MESH-MESHFILE" = "blockMeshDict_axisymm_ChCore.m4" ]
     then
-        offset=0.0
+        offset=$(m4 <<< "esyscmd(perl -e 'printf ( $R + 1e-6 )')")
     fi 
     if [ $(python check_str_in_str.py "blockMeshDict_axisymm_coreCart_reg_unbound" "_MESH-MESHFILE") ]
     then
         offset=0.0
     fi 
-    if [ $(python check_str_in_str.py "axisymm_radial" "_MESH-MESHFILE") ]
-    then
-        offset=0.0
-    fi
     dist=$offset
 
     unit_vector="vector(pos().x,pos().y-$dist,pos().z)/\
@@ -285,7 +251,7 @@ then
     radial_distance="sqrt(pos().x*pos().x + \
                     (pos().y-${dist})*(pos().y-${dist}) + pos().z*pos().z)"
 
-    if [ "_BUBBLE-CYLINDERPLASMA" = "true" ]
+    if [ "_FUNKYSETFIELDS-CYLINDERPLASMA" = "true" ]
     then
         cyl_h=_BUBBLE-PLASMAHEIGHT
         cyl_rad=$(m4 <<< "esyscmd(perl -e 'printf ( sqrt(4.*${R}**3/(3.*${cyl_h})) )')")
@@ -293,7 +259,12 @@ then
                         -time $time -keepPatches >> log.setFields  #-condition 'pos().x <= 50e-6' 
         funkySetFields -case . -field alpha1 -expression "0"\
                         -time $time -keepPatches -condition "pos().x <= ${cyl_rad} && pos().y <= ${cyl_h}/2. + $offset && pos().y >= $offset - ${cyl_h}/2."  >> log.setFields  #
-    elif [ "_BUBBLE-BOXBUBBLE" = "true" ];then
+    else
+        funkySetFields -case . -field alpha1 -expression "0.5*(tanh(($radial_distance-${R})*5.9/${width})+1)"\
+                        -time $time -keepPatches >> log.setFields  #-condition 'pos().x <= 50e-6' 
+    fi
+
+    if [ "_BUBBLE-BOXBUBBLE" = "true" ];then
         if [ "_MESH-MESHDIMS" = "3D" ];then
             blhalf=$(m4 <<< "esyscmd(perl -e 'printf ( $boxEdgeLength_true / 2. )')") 
             funkySetFields -case . -field alpha1 -expression "1.0" -time $time -keepPatches >> log.setFields
@@ -345,42 +316,28 @@ then
             theta=$(cat THETA)
             true_alpha2_vol=$(m4 <<< "esyscmd(perl -e 'printf (  $true_alpha2_vol *180./${theta}  )')")
         elif [ "_MESH-MESHDIMS" = "1D" ];then
-            if [ ! -e THETA ];then
+	    if [ ! -e THETA ];then
                 echo "ERROR: alter your meshDict.m4 such that it writes theta into THETA"
                 exit 1
             fi
             theta=$(cat THETA)
-            theta_rad=$(m4 <<< "esyscmd(perl -e 'printf (  ${theta}*${pi}/180.  )')")
-            true_alpha2_vol=$(m4 <<< "esyscmd(perl -e 'use Math::Trig; printf (  ${true_alpha2_vol}*${pi}/(tan(${theta_rad}))**2  )')")
-        fi
-        #
-        if [ _BUBBLE-METHOD = "Econst" ]
-        then
-            Vn=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${Rn}**(3.)  )')")
-            V0=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${R}**(3.)  )')")
-            R=$(m4 <<< "esyscmd(perl -e 'printf (   (${true_alpha2_vol}/(4.*${pi})*3)**(1./3.)  )')")
-            Ebubble=$(m4 <<< "esyscmd(perl -e 'printf (   ($pBubble * $V0 - $pn * $Vn )/($gamma -1.)  )')")
-            pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   ($Ebubble * ($gamma -1.) + $pn *$Vn )/$true_alpha2_vol  )')")
-            echo "python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble"
-            Rn=$(python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble --pinf $pStat )
-            sed -i "s/ Rn.* Rn.*;/ Rn                 Rn    [0 1 0 0 0 0 0] ${Rn};/g" constant/transportProperties
-            pn=$(m4 <<< "esyscmd(perl -e 'printf (${pStat} + 2.*${sigma}/${Rn} -${pV}  )')")
-            echo "R_0new           = $R "
-            echo "R_n_new          = $Rn "
-            echo "pBubble          = $pBubble "
-            echo "Ebubble          = $Ebubble "
-        elif [ _BUBBLE-METHOD = "adiabatic" ]
-        then
-            R=$(m4 <<< "esyscmd(perl -e 'printf (   (${true_alpha2_vol}/(4.*${pi})*3)**(1./3.)  )')")
-            pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   ${pn}*((${Rn}**3. - ${beta}*${Rn}**3.)/(${R}**3. - ${beta}*${Rn}**3.))**${gamma}  )')")
-            echo "R                = $R       "
-            echo "pBubble          = $pBubble "
-        else
-            echo "please specify method in bubble in conf_dict.json! (either Econst or adiabatic)"
-            exit 1
-        fi
+	    echo "converting true_alpha2_vol to 1D. Theta found to be $theta"
+	    true_alpha2_vol=$(python <<< "import numpy; print( $true_alpha2_vol * ${pi} / (numpy.tan(${theta}/180.*numpy.pi))**2 )" )
+	fi
+        Vn=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${Rn}**(3.)  )')")
+        V0=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${R}**(3.)  )')")
+        R=$(m4 <<< "esyscmd(perl -e 'printf (   (${true_alpha2_vol}/(4.*${pi})*3)**(1./3.)  )')")
+        Ebubble=$(m4 <<< "esyscmd(perl -e 'printf (   ($pBubble * $V0 - $pn * $Vn )/($gamma -1.)  )')")
+        pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   ($Ebubble * ($gamma -1.) + $pn *$Vn )/$true_alpha2_vol  )')")
+        echo "python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble"
+        Rn=$(python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble --pinf $pStat )
+        echo $Rn > Rn_export
+        pn=$(m4 <<< "esyscmd(perl -e 'printf (${pStat} + 2.*${sigma}/${Rn} -${pV}  )')")
+        echo "R_0new           = $R "
+        echo "R_n_new          = $Rn "
+        echo "pBubble          = $pBubble "
         funkySetFields -case . -field $pVar -expression "${pBubble}*(1.-alpha1)+${pStat}*alpha1"\
-                        -time $time -keepPatches >> log.setFields
+                    -time $time -keepPatches >> log.setFields
     fi
 
     ##############################################
@@ -507,15 +464,7 @@ if [ $parallel ];then
     fi
 fi
 
-off=1.5e-6
-y_coord=$(python get_lower_boundary_coord.py -off $off)
-echo "writing probe coordinates ($off  $y_coord  0) to system/controlDict::probes"
-sed -i "s/PROBEX/$off/g" system/controlDict
-sed -i "s/PROBEY/$y_coord/g" system/controlDict
     
- dstar=$(python <<< "print(_BUBBLE-D_INIT*1e6/(3.2290 *$Rn *1e6 - 95.8 ))")
- echo "D* = $dstar"
- 
 if [ "_RUN_CALC_IN_ALLRUN" == "true" ];then
 a=$(date)
     if [ "_DECOMPOSE-DECOMPOSE" = "true" ];then
@@ -538,6 +487,5 @@ fi
     cp $massFile ${massFile}ForParaView
     sed -i "s/#//g" ${massFile}ForParaView
  fi
- 
 
 # ----------------------------------------------------------------- end-of-file
