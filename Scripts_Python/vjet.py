@@ -116,6 +116,7 @@ def render_timestep(fpath,tw,reader,fname):
     #writer.UpdatePipeline(t) 
     #del writer
     del view
+    return t
 
 def get_slope(arr,i):
     slope = (arr[i+1][1]-arr[i][1])/(arr[i+1][0]-arr[i][0])
@@ -160,25 +161,19 @@ def main():
         
         comm = ""
         off = 0
+        taken_time = 0.
         reader = prepare_render_timestep(path)
         while not comm == "q":
             tw = U_arr[i+off][0]
-            render_timestep(path,tw,reader,"jet_formation.png")
-            ##intface_at_start = \
-            ##np.loadtxt(os.path.join(path,
-                       ##"contour/bla.csv"),skiprows=1,
-                       ##delimiter=",")
-            ##plt.plot(intface_at_start.T[0],
-                     ##intface_at_start.T[1])
-            ##plt.axis('square')
-            ##plt.show()
+            taken_time = render_timestep(path,tw,reader,"jet_formation.png")
             comm = input("Type in, how many steps to go left (e.g. -5) or right (e.g. 4) in time until meeting the instant of jet formation. (exit type 0): ")
             try:
                 off = int(comm)
             except(ValueError):
                 comm = "q"
+        i=i+off
         
-        #exit(0)    
+        ###
             
         cylinder_top_y_coord = np.min(minU_pos_arr.T[1])
         #minU = np.min(U_arr.T[1])
@@ -193,31 +188,30 @@ def main():
             
         comm = ""
         off = 0
+        taken_time2 = 0.
         while not comm == "q":
             tw = U_arr[j+off][0]
-            render_timestep(path,tw,reader,"jet_impact.png")
-            ##intface_at_start = \
-            ##np.loadtxt(os.path.join(path,
-                       ##"contour/bla.csv"),skiprows=1,
-                       ##delimiter=",")
-            ##plt.plot(intface_at_start.T[0],
-                     ##intface_at_start.T[1])
-            ##plt.axis('square')
-            ##plt.show()
+            taken_time2 =           render_timestep(path,tw,reader,"jet_impact.png")
             comm = input("Type in, how many steps to go left (e.g. -50) or right (e.g. 400) in time until meeting the instant of jet formation. (exit type q): ")
             try:
                 off = int(comm)
             except(ValueError):
                 comm = "q"
+        j=j+off
+        
+        ###
         
         del reader
         KillSession()
         
         plt.plot(U_arr.T[0][i:j],U_arr.T[1][i:j])
         #plt.plot(minU_pos_arr.T[0][i:j],minU_pos_arr.T[1][i:j])
-        vjet = np.trapz(x=U_arr.T[0][i:j], y=U_arr.T[1][i:j])/(U_arr[j][0]-U_arr[i][0])
-        plt.plot([U_arr[i][0],U_arr[j][0]],[vjet,vjet])
-        print(vjet)
+        interval = taken_time2 -taken_time
+        #vjet = np.trapz(x=U_arr.T[0][i:j], y=U_arr.T[1][i:j])/interval
+        distance = minU_pos_arr.T[1][i] - cylinder_top_y_coord
+        vjet = distance / interval
+        plt.plot([U_arr[i][0],U_arr[j][0]],[-vjet,-vjet])
+        print("{} = vjet, dt = {}, dist = {}".format(vjet,interval,distance))
         plt.savefig("{}.pdf".format(path))
         plt.show()
     else:
