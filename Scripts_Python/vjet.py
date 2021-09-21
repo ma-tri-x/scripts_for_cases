@@ -13,6 +13,12 @@ from vtkmodules.vtkCommonCore import vtkLogger
 
 vtkLogger.SetStderrVerbosity(vtkLogger.VERBOSITY_OFF)
 
+def KillSession():
+    pxm = servermanager.ProxyManager()
+    pxm.UnRegisterProxies()
+    del pxm
+    Disconnect()
+
 def path_is_num(path):
     try:
         float(path)
@@ -205,7 +211,7 @@ def main():
                 comm = "q"
         
         del reader
-        Delete()
+        KillSession()
         
         plt.plot(U_arr.T[0][i:j],U_arr.T[1][i:j])
         #plt.plot(minU_pos_arr.T[0][i:j],minU_pos_arr.T[1][i:j])
