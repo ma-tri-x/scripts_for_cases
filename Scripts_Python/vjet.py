@@ -1,5 +1,5 @@
 #!/bin/python
-import os, sys, argparse, glob, time
+import os, sys, argparse, glob, time, json
 import numpy as np
 import scipy.integrate as integrate
 from shutil import copy2
@@ -12,6 +12,18 @@ from paraview.simple import *
 from vtkmodules.vtkCommonCore import vtkLogger
 
 vtkLogger.SetStderrVerbosity(vtkLogger.VERBOSITY_OFF)
+
+def getparm(path,subdict,query):
+    try:
+        with open(os.path.join(path,"conf_dict.json"),'r') as f:
+            conf_dict = json.load(f)
+    except(ValueError,IOError):
+        return "nan"
+        
+    if subdict:
+        return conf_dict[subdict][query]
+    else:
+        return conf_dict[query]
 
 def KillSession():
     pxm = servermanager.ProxyManager()
@@ -134,88 +146,130 @@ def main():
 
     #args = parser.parse_args()
     
-    path = sys.argv[1]
-    
-    if not os.path.isdir(path):
-        print("ERROR: path not existing")
-        exit(1)
-    
-    postpr_U_path = "postProcessing/swakExpression_extremeUy/0/extremeUy"
-    postpr_minU_pos_path = "postProcessing/swakExpression_minUyPosition/0/minUyPosition"
+    path_glob = sys.argv[1]
+    pathes = glob.glob(path_glob)
+    for path in pathes:
+        if not os.path.isdir(path):
+            print("ERROR: path not existing")
+            exit(1)
+        
+        postpr_U_path = "postProcessing/swakExpression_extremeUy/0/extremeUy"
+        postpr_minU_pos_path = "postProcessing/swakExpression_minUyPosition/0/minUyPosition"
 
-    U_arr = np.loadtxt(os.path.join(path,postpr_U_path),usecols=[0,1])
-    minU_pos_arr = np.loadtxt(os.path.join(path,postpr_minU_pos_path),usecols=[0,2])
-    
-    vjet_absmax = np.min(U_arr.T[1])
-    
-    if vjet_absmax < -500.:
-        i=0
-        #slope=0.
-        #while i < len(U_arr) - 1 and np.abs(slope) < 100./40e-9:
-            #slope = get_slope(U_arr,i)
-            #i = i + 1
-        slope=0.
-        while i < len(U_arr) - 1 and U_arr[i][1] > -500.:
-            i = i + 1
-        i=i-10
+        U_arr = np.loadtxt(os.path.join(path,postpr_U_path),usecols=[0,1])
+        minU_pos_arr = np.loadtxt(os.path.join(path,postpr_minU_pos_path),usecols=[0,2])
         
-        comm = ""
-        off = 0
-        taken_time = 0.
-        reader = prepare_render_timestep(path)
-        while not comm == "q":
-            tw = U_arr[i+off][0]
-            taken_time = render_timestep(path,tw,reader,"jet_formation.png")
-            comm = input("Type in, how many steps to go left (e.g. -5) or right (e.g. 4) in time until meeting the instant of jet formation. (exit type 0): ")
-            try:
-                off = int(comm)
-            except(ValueError):
-                comm = "q"
-        i=i+off
-        
-        ###
-            
+        vjet_absmax = np.min(U_arr.T[1])
         cylinder_top_y_coord = np.min(minU_pos_arr.T[1])
-        #minU = np.min(U_arr.T[1])
-        ycoord = 1000.
-        passed_thres = False
-        thres=-500.
-        j = i
-        while ycoord > cylinder_top_y_coord + 3e-6 and j < len(U_arr) - 1  and not (passed_thres == True and U_arr[j][1] > thres):
-            if U_arr[j][1] < thres-50.: passed_thres = True
-            ycoord = minU_pos_arr[j][1]
-            j = j + 1
+        
+        if vjet_absmax < -500.:
+            i=0
+            #slope=0.
+            #while i < len(U_arr) - 1 and np.abs(slope) < 100./40e-9:
+                #slope = get_slope(U_arr,i)
+                #i = i + 1
+            slope=0.
+            while i < len(U_arr) - 1 and U_arr[i][1] > -500.:
+                i = i + 1
+            i=i-10
             
-        comm = ""
-        off = 0
-        taken_time2 = 0.
-        while not comm == "q":
-            tw = U_arr[j+off][0]
-            taken_time2 =           render_timestep(path,tw,reader,"jet_impact.png")
-            comm = input("Type in, how many steps to go left (e.g. -50) or right (e.g. 400) in time until meeting the instant of jet formation. (exit type q): ")
-            try:
-                off = int(comm)
-            except(ValueError):
-                comm = "q"
-        j=j+off
-        
-        ###
-        
-        del reader
-        KillSession()
-        
-        plt.plot(U_arr.T[0][i:j],U_arr.T[1][i:j])
-        #plt.plot(minU_pos_arr.T[0][i:j],minU_pos_arr.T[1][i:j])
-        interval = taken_time2 -taken_time
-        #vjet = np.trapz(x=U_arr.T[0][i:j], y=U_arr.T[1][i:j])/interval
-        distance = minU_pos_arr.T[1][i] - cylinder_top_y_coord
-        vjet = distance / interval
-        plt.plot([U_arr[i][0],U_arr[j][0]],[-vjet,-vjet])
-        print("{} = vjet, dt = {}, dist = {}".format(vjet,interval,distance))
-        plt.savefig("{}.pdf".format(path))
-        plt.show()
-    else:
-        print("slow jet")
-    
+            comm = ""
+            off = 0
+            taken_time = 0.
+            reader = prepare_render_timestep(path)
+            while not comm == "q":
+                tw = U_arr[i+off][0]
+                taken_time = render_timestep(path,tw,reader,"jet_formation.png")
+                comm = input("Type in, how many steps to go left (e.g. -5) or right (e.g. 4) in time until meeting the instant of jet formation. (exit type q): ")
+                try:
+                    off = int(comm)
+                except(ValueError):
+                    comm = "q"
+            i=i+off
+            
+            ###
+                
+            #minU = np.min(U_arr.T[1])
+            ycoord = 1000.
+            passed_thres = False
+            thres=-500.
+            j = i
+            while ycoord > cylinder_top_y_coord + 3e-6 and j < len(U_arr) - 1  and not (passed_thres == True and U_arr[j][1] > thres):
+                if U_arr[j][1] < thres-50.: passed_thres = True
+                ycoord = minU_pos_arr[j][1]
+                j = j + 1
+                
+            comm = ""
+            off = 0
+            taken_time2 = 0.
+            while not comm == "q":
+                tw = U_arr[j+off][0]
+                taken_time2 =           render_timestep(path,tw,reader,"jet_impact.png")
+                comm = input("Type in, how many steps to go left (e.g. -50) or right (e.g. 400) in time until meeting the instant of jet impact. (exit type q): ")
+                try:
+                    off = int(comm)
+                except(ValueError):
+                    comm = "q"
+            j=j+off
+            
+            ###
+            
+            del reader
+            KillSession()
+            
+            plt.plot(U_arr.T[0][i:j],U_arr.T[1][i:j])
+            #plt.plot(minU_pos_arr.T[0][i:j],minU_pos_arr.T[1][i:j])
+            interval = taken_time2 -taken_time
+            #vjet = np.trapz(x=U_arr.T[0][i:j], y=U_arr.T[1][i:j])/interval
+            distance = minU_pos_arr.T[1][i] - cylinder_top_y_coord
+            vjet = distance / interval
+            plt.plot([U_arr[i][0],U_arr[j][0]],[-vjet,-vjet])
+            print("{} = vjet, dt = {}, dist = {}".format(vjet,interval,distance))
+            plt.savefig("{}.pdf".format(path))
+            plt.show()
+            Rn = getparm(path,"bubble","Rn")
+            dinit = getparm(path,"bubble","D_init")
+            with open("{}.dat".format(path),'w') as out:
+                out.write("#Rn    dinit    vjet_byDef    v_minmin                     dist_from_solid_formation    interval_t1   t2  dt\n")
+                out.write("{}    {}    {}    {}    {}    {}    {}    {}\n".format(Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time2, interval))
+        else:
+            print("-------------- slow jet1")
+            print("-------------- slow jet2")
+            print("-------------- slow jet3!")
+            index_of_max_jet_vel = np.argmin(U_arr.T[1])
+            i = index_of_max_jet_vel
+            comm = ""
+            is_jet = True
+            off = 0
+            taken_time = 0.
+            reader = prepare_render_timestep(path)
+            while not comm == "q":
+                tw = U_arr[i+off][0]
+                taken_time = render_timestep(path,tw,reader,"jet_impact.png")
+                comm = input("Type in, how many steps to go left (e.g. -5) or right (e.g. 4) in time until meeting the instant of jet impact. (exit type q -- no jet type n): ")
+                try:
+                    off = int(comm)
+                except(ValueError):
+                    if comm == "n": is_jet = False
+                    comm = "q"
+            i = np.argmin(np.abs(U_arr.T[0] - taken_time))
+            del reader
+            KillSession()
+            
+            
+            plt.plot(U_arr.T[0][i-200:i+200],U_arr.T[1][i-200:i+200])
+            vjet = U_arr[i][1]
+            distance = minU_pos_arr.T[1][i] - cylinder_top_y_coord
+            plt.plot([U_arr[i-200][0],U_arr[i+200][0]],[vjet,vjet])
+            print("{} = vjet, dist = {}".format(vjet,distance))
+            plt.savefig("{}.pdf".format(path))
+            plt.show()
+            Rn = getparm(path,"bubble","Rn")
+            dinit = getparm(path,"bubble","D_init")
+            if not is_jet: vjet = 0
+            with open("{}.dat".format(path),'w') as out:
+                out.write("#Rn    dinit    vjet_byDef    v_minmin                     dist_from_solid_formation   t_impact\n")
+                out.write("{}    {}    {}    {}    {}    {}\n".format(Rn, dinit, np.abs(vjet), np.abs(vjet_absmax), distance, taken_time))
+
 if __name__=="__main__":
     main()
