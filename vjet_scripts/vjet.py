@@ -207,19 +207,19 @@ def plot_and_save_jet(path,
                           i,
                           taken_time,
                           cylinder_top_y_coord,
-                          j=i,
-                          taken_time2=taken_time):
+                          j,
+                          taken_time2):
     Rn = getparm(path,"bubble","Rn")
     dinit = getparm(path,"bubble","D_init")
     if is_jet:
         if np.abs(vjet_absmax) > 500.:
-            impact_pos = _get_minAlpha1_pos(minAlpha1_pos_arr,time_steps,taken_time2)
+            impact_pos = _get_minAlpha1_pos(path,minAlpha1_pos_arr,time_steps,taken_time2)
             distance = minU_pos_arr.T[1][i] - impact_pos
             interval = taken_time2 -taken_time
             vjet = distance / interval
         else:
             vjet = U_arr[i][1]
-            impact_pos = _get_minAlpha1_pos(minAlpha1_pos_arr,time_steps,taken_time)
+            impact_pos = _get_minAlpha1_pos(path,minAlpha1_pos_arr,time_steps,taken_time)
         
         if np.abs(vjet_absmax) > 500.:
             plt.plot(U_arr.T[0][i:j],U_arr.T[1][i:j])
@@ -228,7 +228,7 @@ def plot_and_save_jet(path,
         else:
             plt.plot(U_arr.T[0][i-400:i+400],U_arr.T[1][i-400:i+400])
             plt.plot([U_arr[i-400][0],U_arr[i+400][0]],[vjet,vjet])
-            print("{} = vjet, dist = {}".format(np.abs(vjet),distance))
+            print("{} = vjet, dist = {}".format(np.abs(vjet),impact_pos))
         
         plt.savefig("{}.pdf".format(path))
         plt.show()
@@ -236,7 +236,7 @@ def plot_and_save_jet(path,
         if np.abs(vjet_absmax) > 500.:
             _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time2, interval)
         else:
-            _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time, 0.)
+            _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,impact_pos,taken_time,taken_time, 0.)
     else:
         distance = minU_pos_arr.T[1][i] - cylinder_top_y_coord
         vjet=0.
@@ -246,8 +246,13 @@ def get_ts_slow_jet(U_arr):
     index_of_max_jet_vel = np.argmin(U_arr.T[1])
     return index_of_max_jet_vel
 
-def _get_minAlpha1_pos(minAlpha1_pos_arr,time_steps,taken_time):
-    return minAlpha1_pos_arr[np.argmin(np.abs(time_steps - taken_time))]
+def _get_minAlpha1_pos(path,minAlpha1_pos_arr,time_steps,taken_time):
+    impact_time_idx = np.argmin(np.abs(time_steps - taken_time))
+    impact_pos = minAlpha1_pos_arr[impact_time_idx]
+    dinit = getparm(path,"bubble","D_init")
+    if impact_pos < -dinit: impact_pos = -dinit
+    print("impact time: {}  impact pos: {}".format(taken_time,impact_pos))
+    return impact_pos
 
 def main():
     this_path = os.path.dirname(os.path.abspath( __file__ ))
@@ -269,8 +274,14 @@ def main():
 
     U_arr = np.loadtxt(os.path.join(path,postpr_U_path),usecols=[0,1])
     minU_pos_arr = np.loadtxt(os.path.join(path,postpr_minU_pos_path),usecols=[0,2])
-    minAlpha1_pos_arr = np.loadtxt(os.path.join(path,minAlpha1_path))
-    time_steps = get_timesteps(os.path.join(path,"processor0"))
+    dinit = getparm(path,"bubble","D_init")
+    # "- dinit" is necessary bec the utility transforms coordinates to
+    # ypos = 0 for solid boundary if solid boundary is in x<80e-6 !
+    minAlpha1_pos_arr = np.loadtxt(os.path.join(path,minAlpha1_path)) - dinit
+    time_steps = np.sort(get_timesteps(os.path.join(path,"processor0")))
+    #minAlpha1_plus_time_arr = np.array([time_steps,minAlpha1_pos_arr]).T
+    #np.savetxt(os.path.join(path,"minAlpha1.dat"),minAlpha1_plus_time_arr)
+    #exit(0)
     if not len(minAlpha1_pos_arr) == len(time_steps):
         print("ERROR: len(minAlpha1_pos_arr) != len(time_steps)!")
         exit(1)
@@ -342,9 +353,9 @@ def main():
                                   minAlpha1_pos_arr,
                                   i,
                                   taken_time,
-                                  cylinder_top_y_coord)
+                                  cylinder_top_y_coord,
+                                  i,
+                                  taken_time)
                 
-    print("If you only postprocessed one case, then type the glob argument into quotes like: \"*Rn*dinit*\" instead of just *Rn*dinit")
-
 if __name__=="__main__":
     main()
