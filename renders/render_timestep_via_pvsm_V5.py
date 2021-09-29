@@ -183,8 +183,8 @@ def render_timestep():
                 reader.UpdatePipeline()
                 rescale_data_range(view)
                 #save screenshot
-                pv.WriteImage("{}{}.png".format(args.outfiles,t_idx))
-                os.system("convert -trim {}{}.png {}{}.png".format(args.outfiles,t_idx,args.outfiles,t_idx))
+                pv.WriteImage("{}{}.png".format(args.outfiles,str(t_idx).zfill(4)))
+                os.system("convert -trim {}{}.png {}{}.png".format(args.outfiles,str(t_idx).zfill(4),args.outfiles,str(t_idx).zfill(4)))
                 #if t_idx ==2: exit(0)
             else:
                 #view = pv.GetActiveView()
