@@ -155,7 +155,8 @@ def traverse_timesteps(path,U_arr,i,reader,time_steps,msg="formation"):
         if i+off < 0: idx = 0
         elif i+off > len(U_arr) -1: idx = len(U_arr) -1
         tw = U_arr[idx][0]
-        taken_time = render_timestep(path,tw,reader,"jet_formation.png",time_steps)
+        fname = "jet_{}.png".format(msg)
+        taken_time = render_timestep(path,tw,reader,fname,time_steps)
         comm = input("Type in, how many steps to go left (e.g. -50) or right (e.g. 40)\nin time until meeting the instant of jet {}.\n(exit type q, skip type s, if there is no jet, type n): ".format(msg))
         try:
             off = int(comm)
@@ -168,6 +169,8 @@ def traverse_timesteps(path,U_arr,i,reader,time_steps,msg="formation"):
 
 def get_left_ts_fastjet(U_arr):
     i=0
+    while U_arr[i][0] < 10e-6:
+        i=i+1
     while i < len(U_arr) - 1 and U_arr[i][1] > -500.:
         i = i + 1
     i=i-10
@@ -184,31 +187,37 @@ def get_right_ts_fastjet(i,U_arr,minU_pos_arr,cylinder_top_y_coord):
         j = j + 1
     return j
 
-def _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time2, interval):
+def _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time2, interval, standard_or_fast):
     with open("{}.dat".format(path),'w') as out:
         out.write("#Rn    dinit    vjet_byDef    v_minmin    dist_from_solid_formation    interval_t1   t2  dt\n")
-        out.write("{}    {}    {}    {}    {}    {}    {}    {}\n".format(Rn,
+        out.write("{}    {}    {}    {}    {}    {}    {}    {}    {}\n".format(Rn,
                                                                           dinit,
                                                                           np.abs(vjet),
                                                                           np.abs(vjet_absmax),
                                                                           distance,
                                                                           taken_time,
                                                                           taken_time2, 
-                                                                          interval)
+                                                                          interval,
+                                                                          standard_or_fast)
         )
 
 def plot_and_save_jet(path,
-                          is_jet,
-                          time_steps,
-                          vjet_absmax,
-                          U_arr,
-                          minU_pos_arr,
-                          minAlpha1_pos_arr,
-                          i,
-                          taken_time,
-                          cylinder_top_y_coord,
-                          j,
-                          taken_time2):
+                      is_jet,
+                      time_steps,
+                      vjet_absmax,
+                      U_arr,
+                      minU_pos_arr,
+                      minAlpha1_pos_arr,
+                      i,
+                      taken_time,
+                      cylinder_top_y_coord,
+                      j,
+                      taken_time2):
+    comm2 = ""
+    while not comm2 == "f" and not comm2 == "s":
+        comm2 = input("Was this a standard-jet or a fast jet? [s/f]: ")
+    standard_or_fast = "1"
+    if comm2 == "s": standard_or_fast = "0"
     Rn = getparm(path,"bubble","Rn")
     dinit = getparm(path,"bubble","D_init")
     if is_jet:
@@ -234,13 +243,13 @@ def plot_and_save_jet(path,
         plt.show()
         
         if np.abs(vjet_absmax) > 500.:
-            _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time2, interval)
+            _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time2, interval, standard_or_fast)
         else:
-            _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,impact_pos,taken_time,taken_time, 0.)
+            _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,impact_pos,taken_time,taken_time, 0., standard_or_fast)
     else:
         distance = minU_pos_arr.T[1][i] - cylinder_top_y_coord
         vjet=0.
-        _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time, 0.)
+        _write_dat_file(path,Rn,dinit,vjet,vjet_absmax,distance,taken_time,taken_time, 0., standard_or_fast)
         
 def get_ts_slow_jet(U_arr):
     index_of_max_jet_vel = np.argmin(U_arr.T[1])
