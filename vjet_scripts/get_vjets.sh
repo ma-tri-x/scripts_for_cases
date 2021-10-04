@@ -9,11 +9,22 @@ summary=jet_velocities_summary.dat
 
 
 # cases=*Rn*dinit*
-cases="
-rpstar0.65_dstar2_Rn158.80_dinit839.38  
-"
+# cases="
+# Rn175.50_dinit30
+# "
+# Rn175.50_dinit150
+# rpstar0.65_dstar2_Rn158.80_dinit839.38  
 # Rn97.00_dinit30
 # rpstar1.05_dstar1_Rn108.30_dinit259.81
+cases="Rn227.25_dinit30
+Rn227.25_dinit90
+Rn227.25_dinit150
+Rn227.25_dinit250
+Rn227.25_dinit350
+Rn227.25_dinit400
+Rn227.25_dinit450
+"
+cases="Rn105.20* Rn116.48* Rn131.52* Rn152.58*"
 
 echo "Do you want to backup and erase $summary ? [y/n]:"
 read bla

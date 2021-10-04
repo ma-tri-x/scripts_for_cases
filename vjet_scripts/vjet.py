@@ -56,12 +56,12 @@ def find_biggest_timestep(time_steps):
 
 def prepare_render_timestep(fpath):
     #this_path = fpath #os.path.dirname(os.path.abspath( __file__ ))
-    state_file = os.path.join(fpath, "states/contour_export2.pvsm")
-    state_file_backup = os.path.join(fpath, "states/contour_export2.pvsm.backup")
+    state_file = os.path.join(fpath, "states/vjet_analysis.pvsm")
+    state_file_backup = os.path.join(fpath, "states/vjet_analysis.pvsm.backup")
     case_name = fpath.split("/")[-1]
-    keyword = "PlotOnIntersectionCurves1"
+    keyword = "Clip3"
     if not os.path.isfile(state_file_backup):
-        print("error: states/contour_export.pvsm.backup file does not exist")
+        print("error: {} file does not exist".format(state_file_backup))
         exit(1)
         
     copy2(state_file_backup,state_file)
