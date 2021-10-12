@@ -966,7 +966,7 @@
       </Property>
       <Property name="Origin" id="4250.Origin" number_of_elements="3">
         <Element index="0" value="0.000199999994927695"/>
-        <Element index="1" value="-0.0003"/>
+        <Element index="1" value="TEMPLATEYCUT"/>
         <Element index="2" value="0"/>
         <Domain name="range" id="4250.Origin.range"/>
       </Property>
