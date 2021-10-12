@@ -168,13 +168,14 @@ def traverse_timesteps(path,U_arr,i,reader,time_steps,msg="formation"):
     i = np.argmin(np.abs(U_arr.T[0] - taken_time))
     return i,taken_time,is_jet,skip
 
-def scan_for_jet_type(path,U_arr,i,reader,time_steps,msg="type"):
+def scan_for_jet_type(path,U_arr,reader,time_steps,msg="type"):
     comm = ""
     off = 0
     taken_time = 0.
     is_jet = True
     skip = False
     is_fast = True
+    i = np.argmin(U_arr.T[1])
     while not comm == "f" and not comm == "s" and not comm == "n" and not comm == "sk":
         idx = i+off
         if i+off < 0: idx = 0
@@ -197,7 +198,7 @@ def get_left_ts_fastjet(U_arr):
     i=0
     while U_arr[i][0] < 10e-6:
         i=i+1
-    while i < len(U_arr) - 1 and U_arr[i][1] > -500.:
+    while i < len(U_arr) - 1 and U_arr[i][1] > -350.:
         i = i + 1
     i=i-10
     return i
@@ -328,7 +329,7 @@ def main():
     reader = prepare_render_timestep(path,cylinder_top_y_coord)
     
     if not os.path.isfile("{}.dat".format(path)):
-        is_jet, skip, is_fast = scan_for_jet_type(path,U_arr,5000,reader,time_steps,msg="type")
+        is_jet, skip, is_fast = scan_for_jet_type(path,U_arr,reader,time_steps,msg="type")
         if is_jet and is_fast and not skip:
             #KillSession()
             #Connect()
