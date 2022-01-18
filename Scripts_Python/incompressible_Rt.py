@@ -48,7 +48,7 @@ def V(r):
 
 def Energy(Rn,R,R0):
     Ebubble=pinf*V(Rn)/(gamma-1.)*((Rn/R)**(3*gamma-3.) - 1.)
-    Eliquid=pinf*(V(R)-V(R0))
+    Eliquid=pinf*(V(R)-V(Rn))
     return Ebubble + Eliquid
 
 def main():
