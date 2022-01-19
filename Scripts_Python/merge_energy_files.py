@@ -36,13 +36,13 @@ def vol_convert(energy):
     with open(os.path.join(this_path,"THETA"),'r') as g:
         t=g.readlines()
     theta = float(t[0].split('\n')[0])
-    if dims == "1D":
+    if "1D" in dims:
         conv_fact = np.pi/np.tan(theta/180.*np.pi)**2
-    if dims == "2D":
+    if "2D" in dims:
         conv_fact = 180./theta
     return conv_fact*energy
 
-def PotEn(al,pg):
+def PotEn(al,pg,Vn):
     V = vol_convert(al.T[1])
     V0= V[0]
     pstat = getparm("liquid","pInf")
@@ -59,7 +59,7 @@ def PotEn(al,pg):
     
     indexRn,timeRn = get_time_of_Rn(al)
     constant = int_pdV[indexRn]
-    potEn = -1*np.array(int_pdV) + constant + pstat*(V-V0)
+    potEn = -1*np.array(int_pdV) + constant + pstat*(V-Vn)
     Etot = potEn[0]
     if not len(potEn) == len(al.T[0]):
         print("coding error: len(potEn)={} len(al.T[0])={}".format(len(potEn),len(al.T[0])))
@@ -69,6 +69,8 @@ def PotEn(al,pg):
     
 
 def main():
+    Rn = getparm("bubble","Rn")
+    Vn=4.*np.pi/3.*Rn**3
     
     postProcessPath = os.path.join(this_path,"postProcessing/volumeIntegrate_volumeIntegral/0/")
     alpha2File = os.path.join(postProcessPath, "alpha2")
@@ -98,7 +100,7 @@ def main():
        and AcTime.all() == alTime.all() \
        and AcTime.all() == AcGTime.all() \
        and AcTime.all() == pgTime.all():
-        potEn,Etot = PotEn(al,pg)
+        potEn,Etot = PotEn(al,pg,Vn)
         radii = radius(al)
         AC = vol_convert(Ac.T[1]) 
         ACG= vol_convert(AcG.T[1])
@@ -107,9 +109,9 @@ def main():
         with open(os.path.join(this_path,"Etot"),"w") as f:
             f.write("{}".format(Etot))
         with open(os.path.join(postProcessPath,"Energies"),"w") as f:
-            f.write("#time[mus]\t alpha2\t radius\t AcEnergy\t AcGasEnergy\t KinEnergy\t PotEnergy\n")
+            f.write("#time[mus]\t alpha2\t radius\t AcEnergy\t AcGasEnergy\t KinEnergy\t PotEnergy\t totEnergy\n")
             for i,t in enumerate(AcTime):
-                totEn = AC[i]+ACG[i]+KI[i]+potEn[i]
+                totEn = AC[i]+KI[i]+ACG[i]+potEn[i]
                 f.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(t*1e6,al[i][1],radii[i],AC[i],ACG[i],KI[i],potEn[i],totEn))
     else:
         print("ERROR: times didn\'t match")
