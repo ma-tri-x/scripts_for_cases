@@ -1,0 +1,109 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+ 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * 2020-02-25 Max Shir * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * to be used with refineMesh with center (0 0 0)* * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'use Math::Trig; use Math::Round; printf ($1)')])
+define(write, [esyscmd(sed -i "s#$1#$2#g" the3Dmesh.json)])
+define(PI, 3.14159265358979323846264338327950288)
+
+//# define function to get circle point coordinates when having origin in (0 0 0)
+//# GCP = getCirclePoint
+//# GCPx = R * cos(phi [deg]) * cos(theta [rad]
+define(GCPx, [calc(($1)*cos( ($2)/180.*PI ) *cos(($3)/180.*PI))])
+define(GCPy, [calc(($1)*sin( ($2)/180.*PI ))])
+define(GCPz, [calc(($1)*cos( ($2)/180.*PI ) *sin(($3)/180.*PI))])
+
+//# faces for hex when starting in the northeast corner with vert 1
+define(hexsouth, [($3 $4 $8 $7)])
+define(hexwest,  [($3 $2 $6 $7)])
+define(hexeast,  [($1 $5 $8 $4)])
+define(hexnorth, [($1 $2 $6 $5)]) 
+define(hexup,    [($7 $8 $5 $6)]) 
+define(hexdown,  [($1 $4 $3 $2)]) 
+
+
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+
+
+
+//# parameters that drive the mesh:
+define(XF,calc(0.5*_MESH-SIZE))              // mesh end (domain C)
+define(NUM,calc(round(_MESH-STARTCELLAMOUNT**(1./3.))))              // mesh end (domain C)
+
+//# n=north, e=east, w=west, s=south, d/u=down/up
+vertices
+(
+    ( XF -XF -XF)      vlabel(edn)
+    (-XF -XF -XF)      vlabel(wdn)
+    (-XF -XF  XF)      vlabel(wds)
+    ( XF -XF  XF)      vlabel(eds)
+    
+    ( XF  XF -XF)      vlabel(eun)
+    (-XF  XF -XF)      vlabel(wun)
+    (-XF  XF  XF)      vlabel(wus)
+    ( XF  XF  XF)      vlabel(eus)
+);
+ 
+blocks
+(
+  hex (edn wdn wds eds  eun wun wus eus)  (NUM NUM NUM)    simpleGrading (1 1 1)
+);
+
+  
+edges                  
+(
+);
+ 
+patches
+(
+     patch side
+     (            
+            hexsouth(edn, wdn, wds, eds,  eun, wun, wus, eus)
+            hexwest( edn, wdn, wds, eds,  eun, wun, wus, eus)
+            hexeast( edn, wdn, wds, eds,  eun, wun, wus, eus)
+            hexnorth(edn, wdn, wds, eds,  eun, wun, wus, eus)
+            hexup(   edn, wdn, wds, eds,  eun, wun, wus, eus)
+            hexdown( edn, wdn, wds, eds,  eun, wun, wus, eus)
+     )
+);   
+     
+
+mergePatchPairs
+(
+);
