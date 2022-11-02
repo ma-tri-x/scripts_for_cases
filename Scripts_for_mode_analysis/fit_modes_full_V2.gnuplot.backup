@@ -1,0 +1,191 @@
+reset
+
+#set term x11
+#set output
+set term jpeg enhanced giant font "DejaVuSerif, 16"
+set output "bla.jpeg"
+set grid 
+set key above
+# set size ratio -1
+
+!echo "" > fit.log
+
+#set xlabel "time [{/Symbol m}s]"
+#set ylabel "Radius [{/Symbol m}m]"
+
+set angle degree
+
+set datafile separator ","
+
+R=184.1e-6
+
+lower=-2.*R*1e6
+upper=2.*R*1e6
+# Restrict a to the range of [lower:upper]
+A(x) = (upper-lower)/180*(atan(x)+90)+lower
+
+phi(x,y) = atan(y/x)
+r(x,y) = sqrt(x*x+y*y)
+new_x(x,y) = pi/2.*R * phi(x,y)/90.
+new_y(x,y) = r(x,y)-R
+lambdaFourth= pi/2.*R
+a0=1.0
+a1=1.0
+b1=1.0
+a2=1.0
+b2=1.0
+a3=1.0
+b3=1.0
+a4=1.0
+b4=1.0
+a5=1.0
+b5=1.0
+a6=0.0
+b6=0.0
+a7=0.0
+b7=0.0
+a8=0.0
+b8=0.0
+a9=0.0
+b9=0.0
+mode1(x) = A(a1)*sin(90./(lambdaFourth   *1e6)*x)  +  A(b1)*cos(90./(lambdaFourth   *1e6)*x)
+mode2(x) = A(a2)*sin(90./(lambdaFourth/2.*1e6)*x)  +  A(b2)*cos(90./(lambdaFourth/2.*1e6)*x)
+mode3(x) = A(a3)*sin(90./(lambdaFourth/3.*1e6)*x)  +  A(b3)*cos(90./(lambdaFourth/3.*1e6)*x)
+mode4(x) = A(a4)*sin(90./(lambdaFourth/4.*1e6)*x)  +  A(b4)*cos(90./(lambdaFourth/4.*1e6)*x)
+mode5(x) = A(a5)*sin(90./(lambdaFourth/5.*1e6)*x)  +  A(b5)*cos(90./(lambdaFourth/5.*1e6)*x)
+mode6(x) = A(a6)*sin(90./(lambdaFourth/6.*1e6)*x)  +  A(b6)*cos(90./(lambdaFourth/6.*1e6)*x)
+mode7(x) = A(a7)*sin(90./(lambdaFourth/7.*1e6)*x)  +  A(b7)*cos(90./(lambdaFourth/7.*1e6)*x)
+mode8(x) = A(a8)*sin(90./(lambdaFourth/8.*1e6)*x)  +  A(b8)*cos(90./(lambdaFourth/8.*1e6)*x)
+mode9(x) = A(a9)*sin(90./(lambdaFourth/9.*1e6)*x)  +  A(b9)*cos(90./(lambdaFourth/9.*1e6)*x)
+full(x) = a0 +\
+          mode1(x) +\
+          mode2(x) +\
+          mode3(x) +\
+          mode4(x) +\
+          mode5(x) +\
+          mode6(x) +\
+          mode7(x) +\
+          mode8(x) +\
+          mode9(x)
+   
+fit a0 "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) via a0   
+
+#symm:
+#a1=1.0
+#b1=1.0
+#a2=1.0
+#b2=1.0
+#a3=1.0
+#b3=1.0
+#a4=1.0
+#b4=1.0
+#a5=1.0
+#b5=1.0
+#a6=1.0
+#b6=1.0
+#a7=1.0
+#b7=1.0
+#a8=1.0
+#b8=1.0
+#a9=1.0
+#b9=1.0
+
+fit full(x) "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) via a1,\
+b1,\
+a2,\
+b2,\
+a3,\
+b3,\
+a4,\
+b4,\
+a5,\
+b5
+
+a6=1.0
+b6=1.0
+a7=1.0
+b7=1.0
+a8=1.0
+b8=1.0
+a9=1.0
+b9=1.0
+
+fit full(x) "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) via a6,\
+b6,\
+a7,\
+b7,\
+a8,\
+b8,\
+a9,\
+b9
+
+#,\
+#a6,\
+#b6,\
+#a7,\
+#b7,\
+#a8,\
+#b8,\
+#a9,\
+#b9
+
+
+#fit full(x) "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) via b1,\
+#b2,\
+#b3,\
+#b4,\
+#b5,\
+#b6,\
+#b7,\
+#b8,\
+#b9
+
+set title sprintf("full %.3f\n%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f",a0,\
+                                                                       A(a1),\
+                                                                       A(a2),\
+                                                                       A(a3),\
+                                                                       A(a4),\
+                                                                       A(a5),\
+                                                                       A(a6),\
+                                                                       A(a7),\
+                                                                       A(a8),\
+                                                                       A(a9),\
+                                                                       A(b1),\
+                                                                       A(b2),\
+                                                                       A(b3),\
+                                                                       A(b4),\
+                                                                       A(b5),\
+                                                                       A(b6),\
+                                                                       A(b7),\
+                                                                       A(b8),\
+                                                                       A(b9))    font "DejaVuSerif, 8"
+
+# set title sprintf("full %.3f\n%.3f %.3f %.3f %.3f %.3f\n%.3f %.3f %.3f %.3f %.3f",a0,\
+#                                                                        A(a1),\
+#                                                                        A(a2),\
+#                                                                        A(a3),\
+#                                                                        A(a4),\
+#                                                                        A(a5),\
+#                                                                        A(b1),\
+#                                                                        A(b2),\
+#                                                                        A(b3),\
+#                                                                        A(b4),\
+#                                                                        A(b5))    font "DejaVuSerif, 8"
+
+plot "Rn164.3_20kHz_0.8/test0.csv" u (($5)*1e6):(($6)*1e6) t "orig",\
+     "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) t "transformed",\
+     full(x) lw 2 not
+
+# Rn164.3_20kHz_0.8
+# p "testfile1.dat" u (($1)*1e6):(($2)*1e6) w l t "blu",\
+#   "testfile2.dat" u (($1)*1e6):(($2)*1e6) w l t "blu2"
+
+#pause -1
+
+#   
+# set term postscript eps color enhanced solid font "DejaVuSerif, 16"
+# set output "bla.eps"
+# replot
+# 
+# !epstopdf bla.eps
+# !rm bla.eps

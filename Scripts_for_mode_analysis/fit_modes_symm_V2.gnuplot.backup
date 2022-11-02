@@ -1,0 +1,111 @@
+reset
+
+#set term x11
+#set output
+set term jpeg enhanced giant font "DejaVuSerif, 16"
+set output "bla.jpeg"
+set grid 
+set key above
+# set size ratio -1
+
+!echo "" > fit.log
+
+#set xlabel "time [{/Symbol m}s]"
+#set ylabel "Radius [{/Symbol m}m]"
+
+set angle degree
+set fit errorvariables
+set datafile separator ","
+
+R=184.1e-6
+
+lower=-2.*R*1e6
+upper=2.*R*1e6
+# Restrict a to the range of [lower:upper]
+A(x) = (upper-lower)/180*(atan(x)+90)+lower
+minphase = -180.
+maxphase = 180.
+P(x) = (maxphase - minphase)/180*(atan(x)+90)+minphase
+
+phi(x,y) = atan(y/x)
+r(x,y) = sqrt(x*x+y*y)
+new_x(x,y) = pi/2.*R * phi(x,y)/90.
+new_y(x,y) = r(x,y)-R
+lambdaFourth= pi/2.*R
+a0=1.0
+a1=1.0
+a2=1.0
+a3=1.0
+a4=1.0
+a5=0.0
+a6=0.0
+a7=0.0
+a8=0.0
+mode1(x) = A(a1)*cos(90./(lambdaFourth   *1e6)*x ) 
+mode2(x) = A(a2)*cos(90./(lambdaFourth/2.*1e6)*x ) 
+mode3(x) = A(a3)*cos(90./(lambdaFourth/3.*1e6)*x ) 
+mode4(x) = A(a4)*cos(90./(lambdaFourth/4.*1e6)*x ) 
+mode5(x) = A(a5)*cos(90./(lambdaFourth/5.*1e6)*x ) 
+mode6(x) = A(a6)*cos(90./(lambdaFourth/6.*1e6)*x ) 
+mode7(x) = A(a7)*cos(90./(lambdaFourth/7.*1e6)*x ) 
+mode8(x) = A(a8)*cos(90./(lambdaFourth/8.*1e6)*x ) 
+#mode9(x) = A(a9)*cos(90./(lambdaFourth/9.*1e6)*x ) 
+full(x) = a0 +\
+          mode1(x) +\
+          mode2(x) +\
+          mode3(x) +\
+          mode4(x) +\
+          mode5(x) +\
+          mode6(x) +\
+          mode7(x) +\
+          mode8(x) 
+          
+          #+\
+          #mode9(x)
+   
+fit a0 "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) via a0   
+
+
+fit full(x) "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) via a1,\
+a2,\
+a3,\
+a4
+
+
+a5=1.0
+a6=1.0
+a7=1.0
+a8=1.0
+
+fit full(x) "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) via a5,\
+a6,\
+a7,\
+a8
+
+zero_if_big_err(x,y) = abs(y/x) > 1.0 ? 0 : x
+
+a0 = zero_if_big_err(a0,a0_err)
+a1 = zero_if_big_err(a1,a1_err)
+a2 = zero_if_big_err(a2,a2_err)
+a3 = zero_if_big_err(a3,a3_err)
+a4 = zero_if_big_err(a4,a4_err)
+a5 = zero_if_big_err(a5,a5_err)
+a6 = zero_if_big_err(a6,a6_err)
+a7 = zero_if_big_err(a7,a7_err)
+a8 = zero_if_big_err(a8,a8_err)
+
+set title sprintf("full %.3f\n%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f",a0,\
+                                                                       A(a1),\
+                                                                       A(a2),\
+                                                                       A(a3),\
+                                                                       A(a4),\
+                                                                       A(a5),\
+                                                                       A(a6),\
+                                                                       A(a7),\
+                                                                       A(a8))    font "DejaVuSerif, 8"
+
+plot "Rn164.3_20kHz_0.8/test0.csv" u (($5)*1e6):(($6)*1e6) t "orig",\
+     "Rn164.3_20kHz_0.8/test0.csv" u (new_x(($5),($6))*1e6):(new_y(($5),($6))*1e6) t "transformed",\
+     full(x) lw 2 not
+
+
