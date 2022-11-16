@@ -1,0 +1,24 @@
+#!/bin/sh
+echo "cleaning case ..."
+if [ -e *.geo ];then
+  if [ ! -d geo ];then
+     mkdir geo
+  fi
+  mv *.geo geo
+fi
+
+# echo "backing up timestep 6.579821935e-05"
+# cp -r 6.579821935e-05 0/backup
+
+rm -rf processor*
+rm -rf sets/
+rm -rf postProcessing/
+rm -rf 0/p_rgh 0/alpha* 0/rho* 0/passiveScalar 0/U*
+rm -rf 0/constant* 0/polyMesh*
+rm -rf 0/*.gz
+rm -rf 0/uniform
+rm -rf log.*
+if [ "_MESH-EXECUTEBLOCKMESH" = "true" ];then
+    rm -f constant/polyMesh/*.gz
+    rm -f constant/polyMesh/boundary
+fi

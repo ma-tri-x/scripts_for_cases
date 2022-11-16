@@ -1,0 +1,633 @@
+#!/bin/bash
+pi="3.14159265358979323846264338327950288"
+
+source $HOME/foam/foam-extend-_FOAM_EXTEND_VERSION/etc/bashrc
+
+if [ _ALLCLEANBEFOREORUN = "true" ];then
+bash Allclean
+fi
+
+if [[ _DECOMPOSE-DECOMPOSE = "true" ]]; then
+ parallel=true
+fi
+
+runRefineMesh ()
+{
+    #echo "Running refineMesh on $PWD"
+    refineMesh -dict > log.refineMesh 
+}
+
+copy_0backup ()
+{
+ echo -e "\ncopying 0/backup/ files..."
+ cp 0/backup/alpha1.org 0/alpha1
+ cp 0/backup/p.org 0/p_rgh
+ cp 0/backup/rho_gTilde.org 0/rho_gTilde
+#  cp 0/backup/rho_gTilde.org 0/rho2Tilde
+#  cp 0/backup/rho_gSource.org 0/rho_gSource
+ cp 0/backup/U 0/U
+ cp 0/backup/passiveScalar 0/passiveScalar
+#  cp 0/backup/alpha1.org 0/CourantNumber
+#  sed -i "s/alpha1/CourantNumber/g" 0/CourantNumber
+ mkdir -p constant/triSurface
+ cp CAD/focuser_axi_meter.obj constant/triSurface/
+}
+
+calculate_acoustic_compressibility ()
+{
+    freq=_ACOUSTICS-FREQUENCY
+    rho_l0=_LIQUID-RHO
+    compressibility=$(m4 <<< "esyscmd(perl -e 'printf ( $rho_l0 / (_LIQUID-GAMMA*( $pStat + _LIQUID-B )) )')")
+    echo $compressibility
+}
+calculate_acoustic_soundspeed ()
+{
+    freq=_ACOUSTICS-FREQUENCY
+    rho_l0=_LIQUID-RHO
+    compressibility=$(calculate_acoustic_compressibility)
+    soundspeed=$(m4 <<< "esyscmd(perl -e 'printf ( sqrt(1.0/$compressibility) )')")
+    echo $soundspeed
+}
+calculate_acoustic_impedance ()
+{
+    freq=_ACOUSTICS-FREQUENCY
+    rho_l0=_LIQUID-RHO
+    compressibility=$(calculate_acoustic_compressibility)
+    soundspeed=$(calculate_acoustic_soundspeed)
+    impedance=$(m4 <<< "esyscmd(perl -e 'printf ( $rho_l0 * $soundspeed ) ')")
+    echo $impedance
+}
+calculate_acoustic_particle_velocity_amplitude ()
+{
+    freq=_ACOUSTICS-FREQUENCY
+    rho_l0=_LIQUID-RHO
+    compressibility=$(calculate_acoustic_compressibility)
+    soundspeed=$(calculate_acoustic_soundspeed)
+    impedance=$(calculate_acoustic_impedance)
+    soundParticleVelocity_amp=$(m4 <<< "esyscmd(perl -e 'printf ( _LIQUID-PINF/ $impedance ) ')")
+    echo $soundParticleVelocity_amp
+}
+calculate_acoustic_lambda ()
+{
+    freq=_ACOUSTICS-FREQUENCY
+    rho_l0=_LIQUID-RHO
+    compressibility=$(calculate_acoustic_compressibility)
+    soundspeed=$(calculate_acoustic_soundspeed)
+    lambda=$(m4 <<< "esyscmd(perl -e 'printf ( $soundspeed/$freq ) ')")
+    echo $lambda
+}
+
+calculate_acoustic_dinit ()
+{
+    freq=_ACOUSTICS-FREQUENCY
+    rho_l0=_LIQUID-RHO
+    compressibility=$(calculate_acoustic_compressibility)
+    soundspeed=$(calculate_acoustic_soundspeed)
+    lambda=$(calculate_acoustic_lambda)
+    dist=$(m4 <<< "esyscmd(perl -e 'printf ( _ACOUSTICS-DINITOVERWRITELAMBDAFOURTH * $lambda *0.25 ) ')")
+    echo $dist
+}
+
+### get solver commit version number: #####
+thisdir=$(pwd)
+cd ${WM_PROJECT_USER_DIR}/localMassCorr_working #$WM_PROJECT_DIR/applications/solvers/multiphase/localMassCorr_working
+version_number=$(git log | head -n 1 | sed "s/commit //g")
+cd $thisdir
+echo $version_number > solver_version_number.info
+###########################################
+
+meshFile=constant/polyMesh/_MESH-MESHFILE
+if [ "_OTHERCONTROLS-USECONSTANTTHETA" = "true" ]
+then
+    echo "overwriting adaptive theta in mesh with _OTHERCONTROLS-CONSTANTTHETA degrees"
+    sed -i "s#//_ALLRUN-OVERWRITETHETA#define(theta, calc(_OTHERCONTROLS-CONSTANTTHETA /PI*180.))#g" $meshFile
+fi
+
+copy_0backup
+
+if [ "_MESH-EXECUTEBLOCKMESH" = "true" ];then
+    echo "m4ing ..."
+    if [ "_ACOUSTICS-SOUNDSOFTWALLS" = "true" ]
+    then
+        sed -i "s/patch wall/patch soundsoft/g" constant/polyMesh/_MESH-MESHFILE
+    fi
+    m4 constant/polyMesh/_MESH-MESHFILE > constant/polyMesh/blockMeshDict
+    
+    echo "blockMeshing..."
+    blockMesh > log.blockMesh
+else
+    echo "NOT blockMeshing"
+fi
+
+if [ "_MESH-STITCHMESH" = "true" ] ; then
+    echo "stitching mesh by using stitchMesh.sh..."
+    rm -f 0/cellDist
+    bash stitchMesh.sh
+fi
+
+if [ "_MESH-REFINEMESH" = "true" ]
+then
+    echo "prepare refining mesh..."
+    n0=_REFINE-STARTCELLAMOUNT
+    csgoal=_MESH-CELLSIZE
+    size=$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf ( _BUBBLE-RMAX * _MESH-DOMAINSIZEFACTORRMAX )')")
+    if [ "_ACOUSTICS-USE" = "true" ];then
+        lambda=$(calculate_acoustic_lambda)
+        size=$(m4 <<< "esyscmd(perl -e 'printf ( $lambda /2.0 ) ')")
+    fi
+    iterations=2
+    if [ "_MESH-MESHDIMS" = "2D" ]
+    then
+        iterations=$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0**(1./2.))/$csgoal)/log(2.)) )')")
+    elif [ "_MESH-MESHDIMS" = "3D" ]
+    then
+        iterations=$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0**(1./3.))/$csgoal)/log(2.)) )')")
+    else
+        iterations=$(m4 <<< "esyscmd(perl -e 'use Math::Round; printf (  round(log($size/($n0)/$csgoal)/log(2.)) )')")
+    fi
+    iterations=`expr $iterations + 1`
+    if [ $iterations -gt 13 ]
+    then
+        echo "impossible number of iterations: $iterations > 10"
+        exit 1
+    fi
+    refineUntil=_REFINE-REFINEUNTIL
+    #distOfRefineStep=$(m4 <<< "esyscmd(perl -e 'printf (  $refineUntil/$iterations )')")
+    #echo "distOfRefineStep = $distOfRefineStep"
+    #refDist=$refineUntil
+    dist=_BUBBLE-D_INIT
+    if [ "_ACOUSTICS-USE" = "true" ];then
+        if [ "_ACOUSTICS-SOUNDSOFTWALLS" = "false" ];then
+            lambdafourth=$(m4 <<< "esyscmd(perl -e 'printf ( $lambda /4.0 )')")
+            echo "... changing D_init for refinement to _ACOUSTICS-DINITOVERWRITELAMBDAFOURTH * $lambdafourth"
+            dist=$(calculate_acoustic_dinit )
+        fi
+    fi
+    j=1
+    while [ $j -lt $iterations ] ; do
+        echo "cp system cellSetDict.1.backup system/cellSetDict.$j"
+        cp system/cellSetDict.1.backup system/cellSetDict.$j
+        sed -i "s/dinit/$dist/g" system/cellSetDict.$j
+        refDist=$(m4 <<< "esyscmd(perl -e 'printf (  $refineUntil/(1.-$iterations)**2 * ($j - $iterations)**2)')")
+        echo "refine radius: $refDist"
+        sed -i "s/rrradius/$refDist/g" system/cellSetDict.$j
+#         refDist=$(m4 <<< "esyscmd(perl -e 'printf ( $refDist - $distOfRefineStep  )')")
+        j=`expr $j + 1`
+    done
+    j=1
+    while [ $j -lt $iterations ] ; do
+        echo "refining step $j..."
+        cp system/cellSetDict.$j system/cellSetDict
+        cellSet > log.cellSet
+        mv log.cellSet log.cellSet.$j
+        echo "refining mesh..."
+        runRefineMesh # eigene Funktion! Siehe oben
+        mv log.refineMesh log.refineMesh.$j
+        cp -r $(python find_biggestNumber.py -p .)/polyMesh/* constant/polyMesh
+        rm -rf $(python find_biggestNumber.py -p .)
+        j=`expr $j + 1`
+    done
+fi
+
+if [ "_MESH-REFINEBOUNDARY" = "true" ]
+then
+    echo "prepare refining mesh at boundary..."
+    #n0=_MESH-STARTCELLAMOUNT
+    #csgoal=_MESH-CELLSIZEGOAL
+    uppery=$(m4 <<< "esyscmd(perl -e 'printf ( 10 * _MESH-CELLSIZE  )')")
+    #distOfRefineStep=$(m4 <<< "esyscmd(perl -e 'printf (  $refineUntil/$iterations )')")
+    #echo "distOfRefineStep = $distOfRefineStep"
+    #refDist=$refineUntil
+    sed -i "s/_REFINELOWERY/-1/g" system/cellSetDict
+    sed -i "s/_REFINEUPPERY/${uppery}/g" system/cellSetDict
+    cellSet > log.cellSet
+    echo "refining mesh at boundary till x= _BUBBLE-RMAX and y= ${uppery}..."
+    runRefineMesh # eigene Funktion! Siehe oben
+    cp -r $(python find_biggestNumber.py -p .)/polyMesh/* constant/polyMesh
+    rm -rf $(python find_biggestNumber.py -p .)
+fi
+
+if [[ "_MESH-SNAPPYHEXMESH" = "true" && "_SNAPPY-BEFOREORAFTERMAKEAXIALMESH" = "before" ]]
+then
+    echo "preparing snappy..."
+    rm -f 0/*.gz
+    rm -rf 0/uniform
+    copy_0backup
+    echo "snappyHexMeshing ..."
+    snappyHexMesh -overwrite > log.snappyHexMesh
+    #cp -r $(python find_biggestNumber.py -p .)/polyMesh/* constant/polyMesh
+    #ts=$(python find_biggestNumber.py -p .)
+    #while [[ $ts != _CONTROLDICT-STARTTIME && $ts != "0.0" ]] ;do
+    #    echo "rm -rf $ts"
+    #    rm -rf $ts
+    #    ts=$(python find_biggestNumber.py -p .)
+    #done
+    copy_0backup
+fi
+
+if [ "_MESH-MAKEAXIALMESH" = "true" ]
+then
+    echo "making axial mesh with angle 4 degrees and patch names frontandback"
+    makeAxialMesh -wedge frontandback -wedgeAngle 4 -axis axis -overwrite > log.makeAxialMesh
+#     echo "collapsingEdges ..."
+#     collapseEdges 1e-9 180 -overwrite > log.collapseEdges
+#     cp 0/polyMesh/* constant/polyMesh/ # <-important bec otherwise decomposePar wont write processor*/0 folders
+#     rm -rf 0/polyMesh # <-important bec otherwise decomposePar wont write processor*/0 folders
+#     checkMesh > log.checkMesh
+#     sed -i "s/symmetryPlane/empty/g" constant/polyMesh/boundary
+#     sed -i "s/symmetryPlane/empty/g" 0/polyMesh/boundary
+#     echo $(grep -E "Zero|zero|skew|Skew" log.checkMesh)
+#     exit 0
+fi
+
+if [[ "_MESH-SNAPPYHEXMESH" = "true" && "_SNAPPY-BEFOREORAFTERMAKEAXIALMESH" = "after" ]]
+then
+    echo "preparing snappy..."
+    rm -f 0/*.gz
+    rm -rf 0/uniform
+    copy_0backup
+    echo "snappyHexMeshing ..."
+    snappyHexMesh -overwrite > log.snappyHexMesh
+    #cp -r $(python find_biggestNumber.py -p .)/polyMesh/* constant/polyMesh
+    #ts=$(python find_biggestNumber.py -p .)
+    #while [[ $ts != _CONTROLDICT-STARTTIME && $ts != "0.0" ]] ;do
+    #    echo "rm -rf $ts"
+    #    rm -rf $ts
+    #    ts=$(python find_biggestNumber.py -p .)
+    #done
+    copy_0backup
+fi
+
+if [ "_MESH-MAKEAXIALMESH" = "true" ]
+then
+    echo "makeAxialMesh part II:"
+    echo "collapsingEdges ..."
+    collapseEdges 1e-9 180 -overwrite > log.collapseEdges
+    cp 0/polyMesh/* constant/polyMesh/ # <-important bec otherwise decomposePar wont write processor*/0 folders
+    rm -rf 0/polyMesh # <-important bec otherwise decomposePar wont write processor*/0 folders
+    checkMesh > log.checkMesh
+    sed -i "s/symmetryPlane/empty/g" constant/polyMesh/boundary
+    sed -i "s/symmetryPlane/empty/g" 0/polyMesh/boundary
+    echo $(grep -E "Zero|zero|skew|Skew" log.checkMesh)
+fi
+
+# exit 0
+
+
+
+pVar="p_rgh"
+
+echo -e "\nsetting fields..."
+
+gamma=_GAS-GAMMA
+pV=_TRANSPORTPROPERTIES-PV
+pStat=_LIQUID-PINF
+Rn=$(m4 <<< "esyscmd(perl -e 'printf ( _BUBBLE-RN * (101315./${pStat} )**(1./3.) )')")
+sigma=_TRANSPORTPROPERTIES-SIGMA
+#BVAN=0.0000364 # m^3/mol
+muwater=_LIQUID-MU
+TEMPREF=_TRANSPORTPROPERTIES-TREF
+GASCONSTGENERAL=_TRANSPORTPROPERTIES-GASCONSTGENERAL # J/mol K
+SPECGASCONST=_GAS-SPECGASCONST
+beta=_GAS-BETA
+
+pn=$(m4 <<< "esyscmd(perl -e 'printf (${pStat} + 2.*${sigma}/${Rn} -${pV}  )')")
+RMax=_BUBBLE-RMAX
+R=_BUBBLE-RSTART
+width=_FUNKYSETFIELDS-WIDTHOFINTERFACE # width of interface
+Uif=_FUNKYSETFIELDS-U_INTERFACE
+
+if [ "_BUBBLE-BOXBUBBLE" = 'true' ];then
+    echo "Converting volume to a grid fitting box volume..."
+    cellsize=_MESH-CELLSIZE
+    sphereVol=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.*(${R})**3  )')")
+    if [ "_MESH-MESHDIMS" = "3D" ];then
+        boxEdgeLength_theory=$(m4 <<< "esyscmd(perl -e 'printf (   (${sphereVol})**(1./3.)  )')")
+        number_of_fitting_cells=$(m4 <<< "esyscmd(perl -e 'printf (   int(${boxEdgeLength_theory}/${cellsize})  )')")
+        boxEdgeLength_true=$(m4 <<< "esyscmd(perl -e 'printf (   ${number_of_fitting_cells}*${cellsize}  )')")
+        boxVol=$(m4 <<< "esyscmd(perl -e 'printf (   ${boxEdgeLength_true}**3  )')")
+        R=$(m4 <<< "esyscmd(perl -e 'printf (   (${boxVol}/(4.*${pi})*3)**(1./3.)  )')")
+        echo "volume change from theoretical sphere to box: $(m4 <<< "esyscmd(perl -e 'printf (   ${boxVol}/${sphereVol}  )')")"
+    elif [ "_MESH-MESHDIMS" = "2D" ];then
+        #box is now cylinder: boxEdgeLength_theory=radius
+        height=$(m4 <<< "esyscmd(perl -e 'printf (   int(2*${R}/${cellsize})*$cellsize  )')")
+        boxEdgeLength_theory=$(m4 <<< "esyscmd(perl -e 'printf (   sqrt(${sphereVol}/${height}/${pi})  )')")
+        number_of_fitting_cells=$(m4 <<< "esyscmd(perl -e 'printf (   int(${boxEdgeLength_theory}/${cellsize})  )')")
+        boxEdgeLength_true=$(m4 <<< "esyscmd(perl -e 'printf (   ${number_of_fitting_cells}*${cellsize}  )')")
+        boxVol=$(m4 <<< "esyscmd(perl -e 'printf (   ${pi}*${boxEdgeLength_true}**2 * ${height} )')")
+        R=$(m4 <<< "esyscmd(perl -e 'printf (   (${boxVol}/(4.*${pi})*3)**(1./3.)  )')")
+        echo "volume change from theoretical sphere to box: $(m4 <<< "esyscmd(perl -e 'printf (   ${boxVol}/${sphereVol}  )')")"
+    else
+        echo "boxBubble not yet implemented for meshdims other than 2D and 3D"
+        exit 1
+    fi
+fi
+
+
+pAtMax=$(m4 <<< "esyscmd(perl -e 'printf (   ${pn}*((${Rn}**3. - ${beta}*${Rn}**3.)/(${RMax}**3. - ${beta}*${Rn}**3.))**${gamma}  )')")
+rho_n=$(m4 <<< "esyscmd(perl -e 'printf ( $pn/($SPECGASCONST*$TEMPREF*(1.-$beta))  )')")
+rho_min=$(m4 <<< "esyscmd(perl -e 'printf ( $rho_n * ($Rn/$RMax)**3. )')")
+pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   ${pn}*((${Rn}**3. - ${beta}*${Rn}**3.)/(${R}**3. - ${beta}*${Rn}**3.))**${gamma}  )')") #1e9 #$Q
+
+
+
+nCells=$(grep "nCells" log.blockMesh)
+
+echo "beta             = $beta    "
+echo "RMax             = $RMax    "
+echo "R0               = $R       "
+echo "widthOfInterface = $width   "
+echo "Uif              = $Uif     "
+echo "pAtRMax          = $pAtMax  "
+echo "p_n              = $pn      "
+echo "Rn               = $Rn      "
+echo "rho_n            = $rho_n   "
+echo "rho_min          = $rho_min "
+echo "pBubble          = $pBubble "
+echo $nCells
+echo "cells now: $(checkMesh | grep "cells:" | sed "s/\s//g" | sed "s/cells://g")"
+
+time=_CONTROLDICT-STARTTIME
+
+if [ "_MAPFIELDS-MAPFIELDS" = "false" ]
+then
+    echo "" > log.setFields
+    offset=_BUBBLE-D_INIT
+    if [ "_MESH-MESHDIMS" = "1D" ];then
+        offset=0.0
+    fi
+    if [[ "_MESH-MESHFILE" = "blockMeshDict_axisymm_ChCore.m4" && ! "_MESH-EXECUTEBLOCKMESH" == "false" ]]
+    then
+        offset=$(m4 <<< "esyscmd(perl -e 'printf ( $R + 1e-6 )')")
+    fi 
+    if [[ $(python check_str_in_str.py "blockMeshDict_axisymm_coreCart_reg_unbound" "_MESH-MESHFILE") && ! "_MESH-EXECUTEBLOCKMESH" == "false" && ! "_BUBBLE-DOUBLEBUBBLE" == "true" ]]
+    then
+        offset=0.0
+        
+    fi 
+    dist=$offset
+
+    unit_vector="vector(pos().x,pos().y-$dist,pos().z)/\
+                (sqrt(pos().x*pos().x +\
+                    (pos().y-${dist})*(pos().y-${dist}) +\
+                        pos().z*pos().z))"
+    distance_vector="vector(pos().x,pos().y-$dist,pos().z)"
+    radial_distance="sqrt(pos().x*pos().x + \
+                    (pos().y-${dist})*(pos().y-${dist}) + pos().z*pos().z)"
+
+    echo "--- setting ambient field ----"
+    if [ "_ACOUSTICS-USE" = "true" ];then
+        echo "... setting acoustic standing wave -----"
+        phase=$(m4 <<< "esyscmd(perl -e 'printf ( _ACOUSTICS-PHASEDEG / 180.*$pi  )')")
+        freq=_ACOUSTICS-FREQUENCY
+        rho_l0=_LIQUID-RHO
+        soundParticleVelocity_amp=0.0 #$(calculate_acoustic_particle_velocity_amplitude)
+        lambda=$(calculate_acoustic_lambda)
+        funkySetFields -case . -field U -expression "0.0 * vector(0,1,0)" -time $time -keepPatches >> log.setFields
+        if [ "_ACOUSTICS-SOUNDSOFTWALLS" = "false" ];then
+            funkySetFields -case . -field $pVar -expression "$pStat + _ACOUSTICS-AMPLITUDEBAR *1e5 *sin(2.*$pi/$lambda *pos().y + $phase)" -time $time -keepPatches >> log.setFields
+            dist=$(calculate_acoustic_dinit)
+            echo "... changing D_init to _ACOUSTICS-DINITOVERWRITELAMBDAFOURTH * $lambda"
+            unit_vector="vector(pos().x,pos().y-$dist,pos().z)/\
+                        (sqrt(pos().x*pos().x +\
+                            (pos().y-${dist})*(pos().y-${dist}) +\
+                                pos().z*pos().z))"
+            distance_vector="vector(pos().x,pos().y-$dist,pos().z)"
+            radial_distance="sqrt(pos().x*pos().x + \
+                            (pos().y-${dist})*(pos().y-${dist}) + pos().z*pos().z)"
+        else
+            funkySetFields -case . -field $pVar -expression "$pStat + _ACOUSTICS-AMPLITUDEBAR *1e5 *cos(2.*$pi/$lambda *pos().y + $phase)" -time $time -keepPatches >> log.setFields
+        fi
+    else
+        echo "... setting U=0 and $pVar = $pStat -----"
+        funkySetFields -case . -field U -expression "0.0 * vector(0,1,0)" -time $time -keepPatches >> log.setFields
+        funkySetFields -case . -field $pVar -expression "$pStat" -time $time -keepPatches >> log.setFields
+    fi
+    
+    echo "---- setting alpha1 field for a bubble with R = $R at D_init = $dist ----"
+    if [ "_BUBBLE-BOXBUBBLE" = "true" ];then
+        if [ "_MESH-MESHDIMS" = "3D" ];then
+            echo "--- applying boxbubble with R = $R and height = $boxEdgeLength_true"
+            blhalf=$(m4 <<< "esyscmd(perl -e 'printf ( $boxEdgeLength_true / 2. )')") 
+            funkySetFields -case . -field alpha1 -expression "1.0" -time $time -keepPatches >> log.setFields
+            funkySetFields -case . -field alpha1 -expression "0.0" -time $time -keepPatches \
+            -condition "pos().x <= $blhalf && pos().x >= -$blhalf && \
+            pos().y <= $blhalf +$dist && pos().y >= -$blhalf+$dist && \
+            pos().z <= $blhalf && pos().z >= -$blhalf " >> log.setFields  #-condition 'pos().x <= 50e-6' 
+        elif [ "_MESH-MESHDIMS" = "2D" ];then
+            echo "--- applying boxbubble with R = $bl and height = $height"
+            hgthalf=$(m4 <<< "esyscmd(perl -e 'printf ( $height / 2. )')") 
+            bl=$boxEdgeLength_true
+            funkySetFields -case . -field alpha1 -expression "1.0" -time $time -keepPatches >> log.setFields
+            funkySetFields -case . -field alpha1 -expression "0.0" -time $time -keepPatches \
+            -condition "pos().x <= $bl  && \
+            pos().y <= $hgthalf+$dist && pos().y >= -$hgthalf+$dist " >> log.setFields  #-condition 'pos().x <= 50e-6' 
+        fi
+    else
+        funkySetFields -case . -field alpha1 -expression "0.5*(tanh(($radial_distance-${R})*5.9/${width})+1)"\
+                        -time $time -keepPatches >> log.setFields  #-condition 'pos().x <= 50e-6' 
+    fi
+    
+    ##obsolete here:
+    #echo "---- setting zero velocity field ----"
+    #funkySetFields -case . -field U      -expression "0.*vector(0,1,0)" -keepPatches -time $time >> log.setFields 
+
+
+    echo "---- setting pressure with same energy for discretization ----"
+    echo "-- reading real discretized alpha2-volume (0/alpha2_vol_t0)"
+    get_alpha2_vol_t0 > log.get_alpha2_vol_t0
+    true_alpha2_vol=$(cat 0/alpha2_vol_t0)
+    if [ "_MESH-MESHDIMS" = "2D" ];then
+        if [ ! -e THETA ];then
+            echo "ERROR: alter your meshDict.m4 such that it writes theta into THETA"
+            exit 1
+        fi
+        theta=$(cat THETA)
+        true_alpha2_vol=$(m4 <<< "esyscmd(perl -e 'printf (  $true_alpha2_vol *180./${theta}  )')")
+    elif [ "_MESH-MESHDIMS" = "1D" ];then
+        if [ ! -e THETA ];then
+            echo "ERROR: alter your meshDict.m4 such that it writes theta into THETA"
+            exit 1
+        fi
+        theta=$(cat THETA)
+        theta_rad=$(m4 <<< "esyscmd(perl -e 'printf (  ${theta}*${pi}/180.  )')")
+        true_alpha2_vol=$(m4 <<< "esyscmd(perl -e 'use Math::Trig; printf (  ${true_alpha2_vol}*${pi}/(tan(${theta_rad}))**2  )')")
+    fi
+    pBubble_old=$pBubble
+    Vn=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${Rn}**(3.)  )')")
+    V0=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${R}**(3.)  )')")
+    R=$(m4 <<< "esyscmd(perl -e 'printf (   (${true_alpha2_vol}/(4.*${pi})*3)**(1./3.)  )')")
+    Ebubble=$(m4 <<< "esyscmd(perl -e 'printf (   ($pBubble * $V0 - $pn * $Vn )/($gamma -1.) + $pStat*($V0 - $Vn)  )')")
+    pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   (($gamma -1.)*($Ebubble - $pStat*($V0-$Vn)) + $pn *$Vn )/$true_alpha2_vol  )')")
+    echo "python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble"
+    Rn=$(python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $R -s $sigma --p0 $pBubble --pinf $pStat )
+    echo $Rn > Rn_export
+    pn=$(m4 <<< "esyscmd(perl -e 'printf (${pStat} + 2.*${sigma}/${Rn} -${pV}  )')")
+    echo "R_0new           = $R "
+    echo "R_n_new          = $Rn "
+    echo "pBubble_old      = $pBubble_old"
+    echo "pBubble_new      = $pBubble "
+    funkySetFields -case . -field $pVar -expression "${pBubble}*(1.-alpha1)+${pVar}*alpha1"\
+                -time $time -keepPatches >> log.setFields
+    
+    if [ "_BUBBLE-DOUBLEBUBBLE" = "true" ]
+    then
+        echo "---- putting second bubble of same energy ----"
+        dist=-$offset
+        unit_vector="vector(pos().x,pos().y-$dist,pos().z)/\
+                    (sqrt(pos().x*pos().x +\
+                        (pos().y-${dist})*(pos().y-${dist}) +\
+                            pos().z*pos().z))"
+        distance_vector="vector(pos().x,pos().y-$dist,pos().z)"
+        radial_distance="sqrt(pos().x*pos().x + \
+                        (pos().y-${dist})*(pos().y-${dist}) + pos().z*pos().z)"
+        funkySetFields -case . -field alpha1 -expression "0.5*(tanh(($radial_distance-${R})*5.9/${width})+1)"\
+                        -condition 'pos().y <= 0.0' -time $time -keepPatches >> log.setFields  
+        funkySetFields -case . -field $pVar -expression "${pBubble}*(1.-alpha1)+${pVar}*alpha1"\
+                        -condition 'pos().y <= 0.0' -time $time -keepPatches >> log.setFields
+    fi
+
+    if [ "_FUNKYSETFIELDS-UPROFILE" = "inletoutlet" ]
+    then
+        echo "---- using inletoutlet U profile ----"
+        funkySetFields -case . -field U -expression "_OTHERCONTROLS-INLETU*vector(0,1,0)" -keepPatches -time $time >> log.setFields
+    elif [ "_FUNKYSETFIELDS-UPROFILE" = "UifBiggerZero" ]
+    then
+        echo "---- using simple U profile where U_if > 0 ----"
+        echo "WARNING: acoustic U field is^ killed"
+
+        funkySetFields -case . -field U -expression \
+            "${Uif}*$unit_vector*$R/\
+            pow($radial_distance,1.0)"\
+            -condition "$radial_distance >= ${R}" \
+            -keepPatches -time $time >> log.setFields
+
+        funkySetFields -case . -field U -expression \
+            "${Uif}/${R}*$distance_vector"\
+                -condition "$radial_distance < ${R}" \
+                -keepPatches -time $time >> log.setFields
+    fi
+    
+    #-----------------passiveScalar part: -------------------
+    if [[ "_FUNKYSETFIELDS-PASSIVESCALARMETHOD" == "Vogel"  ]]
+    then
+        if [[ ! "_MESH-MESHDIMS" == "2D" ]]
+        then
+            echo "ERROR: passiveScalarMethod only implemented for 2D mesh"
+            exit 1
+        fi
+        echo "----- using passiveScalarMethod Vogel ------"
+        cellsize=_MESH-CELLSIZE
+        funkySetFields -case . -field passiveScalar -expression "0.0" -time 0 -keepPatches  >> log.setFields
+        RcolorMarker=$(m4 <<< "esyscmd(perl -e 'printf ( 4.*${cellsize} )' )")
+        echo $RcolorMarker
+        numberOfMarkers=_FUNKYSETFIELDS-NUMBEROFMARKERS
+        numberOfMarkerLayers=_FUNKYSETFIELDS-NUMBEROFMARKERLAYERS
+        angle=$(m4 <<< "esyscmd(perl -e 'printf ( ${pi}/$numberOfMarkers )' )")
+        echo $angle
+        j=1
+        k=0
+        while [[ $k -lt $numberOfMarkerLayers ]]; do
+            while [[ $j -lt $numberOfMarkers ]] ; do
+                echo "setting color marker $j in layer $k..."
+                ycenter=$(m4 <<< "esyscmd(perl -e 'printf ( $dist - (3.5 + $k)*$R  * cos($j * $angle) )' )")
+                xcenter=$(m4 <<< "esyscmd(perl -e 'printf ( (3.5 + $k)* $R * sin($j * $angle) )' )")
+                distance_vector="vector(pos().x-($xcenter),pos().y-($ycenter),pos().z)"
+                radial_distance="sqrt((pos().x-($xcenter) )*(pos().x-($xcenter) ) + (pos().y-(${ycenter}))*(pos().y-(${ycenter})) + pos().z*pos().z)"
+                unit_vector="$distance_vector/$radial_distance"
+                funkySetFields -case . -field passiveScalar -expression "1.0"  \
+                        -condition "$radial_distance < $RcolorMarker " -time 0 -keepPatches >> log.setFields
+                j=`expr $j + 1`
+            done
+            j=1
+            k=`expr $k + 1`
+        done
+    elif [[ "_FUNKYSETFIELDS-PASSIVESCALARMETHOD" == "azimuthal"  ]]
+    then
+#         if [[ ! "_MESH-MESHDIMS" == "2D" ]]
+#         then
+#             echo "passiveScalarMethod only implemented for 2D mesh"
+#             exit 1
+#         fi
+        echo "----- using passiveScalarMethod azimuthal ------"
+        radial_distance="sqrt( pos().x*pos().x + (pos().y-(${dist}))*(pos().y-(${dist})) + pos().z*pos().z)"
+        funkySetFields -case . -field passiveScalar -expression "1.0" -time 0 -keepPatches  >> log.setFields
+#         funkySetFields -case . -field passiveScalar -expression "exp(-($radial_distance/(150e-6) -1.))" -condition "$radial_distance > 150e-6" \
+#                                                                               -time 0 -keepPatches  >> log.setFields
+        funkySetFields -case . -field passiveScalar -expression "0.0" -condition "$radial_distance > 200e-6" \
+                                                                              -time 0 -keepPatches  >> log.setFields
+    else 
+        #X=$(m4 <<< "esyscmd(perl -e 'printf ( 2.*${RMax} )' )")
+        #Y=$(m4 <<< "esyscmd(perl -e 'printf ( 1.5 *(${RMax} + _BUBBLE-D_INIT ) )' )")
+        Y=$(m4 <<< "esyscmd(perl -e 'printf ( 1.5 *(${RMax}  ) + $dist )' )")
+        echo "---- passiveScalar part till X,Y: $X,$Y ----"
+        funkySetFields -case . -field passiveScalar -expression "1.0" -time 0 -keepPatches  >> log.setFields
+        funkySetFields -case . -field passiveScalar -expression "pos().y/$Y" -time 0 -keepPatches  \
+                        -condition "pos().y < $Y " >> log.setFields
+    fi
+    #---------------------------------------------------------
+    
+    ###############################################
+    ###############################################
+    if [[ "_DECOMPOSE-METHOD" == "manual" ]]
+    then
+        python _DECOMPOSE-MANUALSCRIPT
+        #cp constant/cellDist 0/
+        #sed -i "s/constant/0/g" 0/cellDist
+    fi
+
+else
+    startTime=_CONTROLDICT-STARTTIME
+    sourceDir=_MAPFIELDS-SOURCEDIR
+    thisdir=$(pwd)
+    cd $sourceDir
+    reconstructPar -time $startTime > log.reconstructPar
+    cd $thisdir
+    if [ ! -d $startTime ]
+    then 
+        mkdir $startTime
+        cp 0/* $startTime
+    fi
+    echo "---- mapping fields with $sourceDir _MAPFIELDS-OPTIONS ........"
+    mapFields $sourceDir _MAPFIELDS-OPTIONS > log.mapFields
+fi
+
+
+if [ $parallel ];then
+    echo "decomposing with xyz: _DECOMPOSE-XYZ by method: _DECOMPOSE-METHOD"
+    decomposePar > log.decomposePar
+
+
+    if [ ! -d processor0/constant/polyMesh ]
+    then
+        echo "writing mesh to processor*/constant because it wasn't created..."
+        for coreDir in processor*; do 
+            mkdir -p $coreDir/constant
+            mv $coreDir/0/polyMesh $coreDir/constant
+            rm -rf $coreDir/0
+        done
+    fi
+
+
+    threads=$(grep "^numberOfSubdomains" system/decomposeParDict | sed "s/^numberOfSubdomains *\([0-9]*\);/\1/")
+    method=$( grep "^method" system/decomposeParDict | sed "s/^method *\([a-zA-Z]*\);/\1/")
+    echo "slots = ${threads}, decomposed with $method"
+    if [ -e constant/dynamicMeshDict ]
+    then
+        for i in proc*
+        do
+            cp constant/dynamicMeshDict $i/constant/
+        done
+    fi
+    
+    if [ "_MESH-SNAPPYHEXMESH" == "true" ]
+    then
+        mkdir -p constant/polyMesh/temp
+        mv constant/polyMesh/*.gz      constant/polyMesh/temp
+        mv constant/polyMesh/boundary  constant/polyMesh/temp
+    fi
+fi
+
+echo "----- DONE creating case -----"
+
+# ----------------------------------------------------------------- end-of-file

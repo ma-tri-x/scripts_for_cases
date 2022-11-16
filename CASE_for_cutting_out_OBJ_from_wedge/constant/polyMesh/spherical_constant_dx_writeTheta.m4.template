@@ -1,0 +1,148 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version         2.0;
+    format          ascii;
+ 
+    root            "";
+    case            "";
+    instance        "";
+    local           "";
+ 
+    class           dictionary;
+    object          blockMeshDict;
+}
+ 
+ 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * rebuild * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * 2022-01-19 Max Koch spherical * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * (f/b)ct * * * * * * * rt* * * * * * * * * *(f/b)Rt* * * * * * * //
+// * * * * * * * * _________Rmax___*__________________________ * * * * * * * //
+// * * * * * * * < __ ___A___)_____|____________B_____________|* * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * (f/b)cd * * * * * * * rd* * * * * * * * * *(f/b)Rd* * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * | * * * * * * * * | * * * * * * * * * * * * *|* * * * * * * //
+// * * * * * * * 0 * * * * * * * * X * * * * * * * * * * * * *XF * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+changecom(//)changequote([,])
+ 
+define(calc, [esyscmd(perl -e 'use Math::Trig;use Math::Round; printf ($1)')])
+define(PI, 3.14159265358979323846264338327950288)
+define(writeTheta, [esyscmd(echo '$1' > THETA)])
+ 
+define(VCOUNT, 0)
+ 
+define(vlabel, [[// ]Vertex $1 = VCOUNT define($1, VCOUNT)define([VCOUNT], incr(VCOUNT))])
+
+convertToMeters 1;
+
+define(GCPx, [calc(($1)*cos( ($2)/180.*PI ) *cos( ($3)/180.*PI ))])
+define(GCPy, [calc(($1)*sin( ($2)/180.*PI ))])
+define(GCPz, [calc(($1)*cos( ($2)/180.*PI ) *sin( ($3)/180.*PI ))])
+
+
+
+
+define(Rmax, _BUBBLE-RMAX)
+define(C, _MESH-MESHCORESIZE)
+define(X, calc(_MESH-FACTORBUBBLEDOMAINRMAX * Rmax))                     // bubble domain im (domain B)
+define(XF,calc(_MESH-DOMAINSIZEFACTORRMAX * Rmax))              // mesh end (domain C)
+define(cellsize, _MESH-CELLSIZE)      // angular number of cells in core domain
+
+
+define(numCore,calc(round(X/cellsize)))
+define(numElse,calc(round((XF-X)/(2.*cellsize))))
+define(deg90num, calc(2*numCore))
+define(theta, calc(90./deg90num/2.))
+writeTheta(theta)
+
+
+vertices
+(
+    (                     0                0                      0)      vlabel(fcd)
+    (                     0                0                      0)      vlabel(fct)
+    (                     0                0                      0)      vlabel(bct)
+    (                     0                0                      0)      vlabel(bcd)
+    
+    (GCPx(X ,-theta, theta) GCPy(X ,-theta)  GCPz(X ,-theta, theta))      vlabel(frd)
+    (GCPx(X , theta, theta) GCPy(X , theta)  GCPz(X , theta, theta))      vlabel(frt)
+    (GCPx(X , theta,-theta) GCPy(X , theta)  GCPz(X , theta,-theta))      vlabel(brt)
+    (GCPx(X ,-theta,-theta) GCPy(X ,-theta)  GCPz(X ,-theta,-theta))      vlabel(brd)
+    
+    (GCPx(XF,-theta, theta) GCPy(XF,-theta)  GCPz(XF,-theta, theta))      vlabel(fRd)
+    (GCPx(XF, theta, theta) GCPy(XF, theta)  GCPz(XF, theta, theta))      vlabel(fRt)
+    (GCPx(XF, theta,-theta) GCPy(XF, theta)  GCPz(XF, theta,-theta))      vlabel(bRt)
+    (GCPx(XF,-theta,-theta) GCPy(XF,-theta)  GCPz(XF,-theta,-theta))      vlabel(bRd)
+);
+ 
+blocks
+(
+  hex (fcd frd brd bcd   fct frt brt bct)   (numCore 1 1) simpleGrading (   1 1 1)
+  hex (frd fRd bRd brd   frt fRt bRt brt)   (numElse 1 1) simpleGrading (   1 1 1)
+);
+
+edges
+(
+);
+ 
+patches
+(
+     wedge front
+     (
+           (fcd frd frt fct)  
+           (frd fRd fRt frt)   
+     )
+     
+     wedge back
+     (
+           (bcd bct brt brd)
+           (brd brt bRt bRd) 
+     )
+     
+     wedge top
+     (
+           (fct frt brt bct)
+           (frt fRt bRt brt)
+     )
+     
+     wedge bottom
+     (
+           (fcd bcd brd frd)
+           (frd brd bRd fRd)
+     )
+     
+     patch side
+     (
+            (fRd bRd bRt fRt)
+     )                   
+     
+     empty axis             
+     (                      
+            (fcd fct bct bcd)   
+     )                      
+
+);
+
+
+mergePatchPairs
+(
+);

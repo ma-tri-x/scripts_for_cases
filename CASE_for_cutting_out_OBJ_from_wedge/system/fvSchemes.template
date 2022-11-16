@@ -1,0 +1,74 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    default         _SCHEMES-DDT;
+}
+
+gradSchemes
+{
+    default         _SCHEMES-GRAD;
+}
+
+divSchemes
+{
+    default            _SCHEMES-DIV;
+    div(phirb,alpha) Gauss interfaceCompression; //alpharScheme
+    div(phiAlpha2,rho_gTilde)  _SCHEMES-ALPHA2DIV;
+    div(phi,PS) Gauss SuperBee;
+    div(phirb,PS) Gauss interfaceCompression; //alpharScheme
+}
+     //div(phirb,alpha) Gauss interfaceCompression;
+     //div(phiAlpha2,rho_gTilde)  Gauss upwind;
+
+// /*divSchemes
+// {
+//     div(phi,alpha)   Gauss interfaceCompression; //alphaScheme
+//     default            Gauss vanLeer;
+//     flux(phiCalpha) Gauss interfaceCompression;
+// }*/
+
+
+laplacianSchemes
+{
+    default         _SCHEMES-LAPLACIAN; 
+}
+
+interpolationSchemes
+{
+    default         _SCHEMES-INTERPOLATION;
+//     default         Gamma phi 0.7;
+}
+snGradSchemes
+{
+    default              _SCHEMES-SNGRAD;
+    snGrad(rho)          _SCHEMES-PRGHSNGRAD;
+    snGrad(alpha1)       _SCHEMES-ALPHA1SNGRAD;
+    snGrad(p_rgh)        _SCHEMES-PRGHSNGRAD;
+}
+
+fluxRequired
+{
+    default              none;
+    p_rgh;
+    sumP_rgh;
+    alpha1;
+}
+
+
+// ************************************************************************* //

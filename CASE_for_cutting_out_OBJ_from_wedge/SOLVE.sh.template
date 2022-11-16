@@ -1,0 +1,2 @@
+#!/bin/bash
+mpirun -np _DECOMPOSE-THREADS localMassCorr_working -parallel > run.log 2>&1 
