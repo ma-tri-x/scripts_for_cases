@@ -21,7 +21,7 @@ def main():
     pmax=0.
     for line in a[22:]:
         try:
-            val = float(line.split("\n")[0])
+            val = float((line.decode('utf-8')).split("\n")[0])
         except(ValueError):
             pass
         if val > pmax: pmax = val
