@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  X.X-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      myTransportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+gas
+{
+    mu                   mu    [1 -1 -1 0 0 0 0] _GAS-MU;
+    gamma                gamma [0 0 0 0 0 0 0] _GAS-GAMMA;
+    beta                 beta  [0 0 0 0 0 0 0] _GAS-BETA;
+    Rn                   Rn    [0 1 0 0 0 0 0] _BUBBLE-RN;
+    aimedRn            aimedRn [0 1 0 0 0 0 0] _ALLRUN-AIMEDRN;
+    pMin                 pMin  [1 -1 -2 0 0 0 0] _GAS-PMIN; // 2337;
+    specGasConst  specGasConst [0 2 -2 -1 0 0 0] _GAS-SPECGASCONST; //287.
+    RMax                 RMax  [0 1 0 0 0 0 0] _BUBBLE-RMAX;
+}
+
+liquid
+{
+    mu                 mu    [1 -1 -1 0 0 0 0] _LIQUID-MU;
+    gamma              gamma [0 0 0 0 0 0 0] _LIQUID-GAMMA; //7;
+    rho                rho   [1 -3 0 0 0 0 0] _LIQUID-RHO; //998.20608789369
+    B                 B      [1 -1 -2 0 0 0 0] _LIQUID-B; //3046e5; //calc(3000*101325); //304600000;
+    pInf               pInf  [1 -1 -2 0 0 0 0] _LIQUID-PINF;
+}
+
+
+sigma              sigma   [1 0 -2 0 0 0 0] _TRANSPORTPROPERTIES-SIGMA;
+psiZero            psiZero [0 -2 2 0 0 0 0] _TRANSPORTPROPERTIES-PSIZERO; // must be near 0. but never 0.
+Tref               Tref    [0 0 0 1 0 0 0] _TRANSPORTPROPERTIES-TREF;
+
+t_transit_start t_transit_start [0 0 1 0 0 0 0] _BUBBLE-TTRANSITSTART;
+dt_transit      dt_transit [0 0 1 0 0 0 0] _BUBBLE-DTTRANSIT;

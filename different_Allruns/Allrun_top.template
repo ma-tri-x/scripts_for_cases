@@ -1,0 +1,5 @@
+#!/bin/bash
+
+thisdir=$(pwd)
+
+bash _ALLRUN-WHICHALLRUN

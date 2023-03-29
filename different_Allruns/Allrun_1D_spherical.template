@@ -1,0 +1,261 @@
+#!/bin/bash
+pi="3.14159265358979323846264338327950288"
+
+start=$(date)
+
+source $HOME/foam/foam-extend-_FOAM_EXTEND_VERSION/etc/bashrc
+
+pVar="p_rgh"
+rho2tildeVar="rho_gTilde"
+
+if [ _ALLCLEANBEFOREORUN = "true" ];then
+bash Allclean
+fi
+
+if [[ _DECOMPOSE-DECOMPOSE = "true" ]]; then
+ parallel=true
+fi
+
+runRefineMesh ()
+{
+    #echo "Running refineMesh on $PWD"
+    refineMesh -dict > log.refineMesh 
+}
+
+
+copy_0backup ()
+{
+ echo -e "\ncopying 0/backup/ files..."
+ cp 0/backup/alpha1.org 0/alpha1
+ cp 0/backup/${pVar}.org 0/${pVar}
+ cp 0/backup/${rho2tildeVar}.org 0/${rho2tildeVar}
+ cp 0/backup/U 0/U
+ cp 0/backup/passiveScalar.org 0/passiveScalar
+}
+
+
+determine_offset() {
+offset=_BUBBLE-D_INIT
+if [ "_MESH-MESHDIMS" = "1D" ];then
+    offset=0.0
+fi
+if [ "_ACOUSTICS-BESSEL" = "true" ];then
+    offset=0.0
+fi
+if [[ "_MESH-MESHFILE" = "blockMeshDict_axisymm_ChCore.m4" && ! "_MESH-EXECUTEBLOCKMESH" == "false" ]]
+then
+    offset=$(m4 <<< "esyscmd(perl -e 'printf ( $R + 1e-6 )')")
+fi 
+if [[ $(python check_str_in_str.py "blockMeshDict_axisymm_coreCart_reg_unbound" "_MESH-MESHFILE") && ! "_MESH-EXECUTEBLOCKMESH" == "false" && ! "_BUBBLE-DOUBLEBUBBLE" == "true" ]]
+then
+    offset=0.0
+    
+fi 
+if [ "_ACOUSTICS-SOUNDSOFTWALLS" = "false" ];then
+    echo "... changing D_init to _ACOUSTICS-DINITOVERWRITELAMBDAFOURTH * $lambda"
+    offset=$(calculate_acoustic_dinit)
+fi
+echo $offset
+}
+
+
+
+
+
+
+
+### get solver commit version number: #####
+thisdir=$(pwd)
+cd ${WM_PROJECT_USER_DIR}/localMassCorr_working #$WM_PROJECT_DIR/applications/solvers/multiphase/localMassCorr_working
+version_number=$(git log | head -n 1 | sed "s/commit //g")
+cd $thisdir
+echo $version_number > solver_version_number.info
+###########################################
+
+meshFile=constant/polyMesh/_MESH-MESHFILE
+
+copy_0backup
+
+if [ "_MESH-EXECUTEBLOCKMESH" = "true" ];then
+    echo "m4ing ..."
+        
+    m4 constant/polyMesh/_MESH-MESHFILE > constant/polyMesh/blockMeshDict
+    
+    echo "blockMeshing..."
+    blockMesh > log.blockMesh
+else
+    echo "NOT blockMeshing"
+fi
+
+if [ "_MESH-USEGMSHFILE" = "true" ];then
+    echo "meshing from geo file..."
+    meshFile=geo/_MESH-MESHFILE
+    gmsh -3  -format msh2 $meshFile > log.gmsh
+    gmshToFoam ${meshFile%.geo}.msh >> log.gmsh
+    changeDictionary > log.changeDictionary
+fi
+
+
+
+echo -e "\nsetting fields..."
+
+gamma=_GAS-GAMMA
+pStat=_LIQUID-PINF
+sigma=_TRANSPORTPROPERTIES-SIGMA
+#BVAN=0.0000364 # m^3/mol
+echo "--- Rn adaptation from 101315 Pa to $pStat ---"
+Rn=$(python get_true_Rn_from_pinf_change_with_sigma.py -Rn _BUBBLE-RN -s $sigma --pinf $pStat) 
+aimedRn=$(python get_true_Rn_from_pinf_change_with_sigma.py -Rn _BUBBLE-AIMEDRN -s $sigma --pinf $pStat) 
+sed -i "s/_ALLRUN-AIMEDRN/$aimedRn/g" constant/transportProperties
+echo "which Rn   before   after"
+echo "Rn1   _BUBBLE-RN   $Rn"
+echo "Rn2   _BUBBLE-AIMEDRN   $aimedRn"
+muwater=_LIQUID-MU
+TEMPREF=_TRANSPORTPROPERTIES-TREF
+GASCONSTGENERAL=_TRANSPORTPROPERTIES-GASCONSTGENERAL # J/mol K
+SPECGASCONST=_GAS-SPECGASCONST
+
+pn=$(m4 <<< "esyscmd(perl -e 'printf (${pStat} + 2.*${sigma}/${Rn}  )')")
+RMax=_BUBBLE-RMAX
+R=_BUBBLE-RSTART
+width=_FUNKYSETFIELDS-WIDTHOFINTERFACE # width of interface
+
+rho_n=$(m4 <<< "esyscmd(perl -e 'printf ( $pn/($SPECGASCONST*$TEMPREF)  )')")
+rho_min=$(m4 <<< "esyscmd(perl -e 'printf ( $rho_n * ($Rn/$RMax)**3. )')")
+pBubble=$(m4 <<< "esyscmd(perl -e 'printf (   ${pn}*(${Rn}/${R})**(3*${gamma})  )')") #1e9 #$Q
+
+nCells=$(grep "nCells" log.blockMesh)
+
+echo "R0               = $R       "
+echo "Rn1              = $Rn      "
+echo "Rn2              = $aimedRn "
+echo "p_n              = $pn      "
+echo "pBubble          = $pBubble "
+echo "$nCells" # in nCells there is already in: "nCells: "
+echo "cells now: $(checkMesh | grep "cells:" | sed "s/\s//g" | sed "s/cells://g")"
+
+time=_CONTROLDICT-STARTTIME
+
+
+echo "" > log.setFields
+
+offset=$(determine_offset )
+dist=$offset
+
+x_coord="pos().x"
+y_coord="pos().y"
+z_coord="pos().z"
+sq_x="$x_coord*$x_coord"
+sq_y="($y_coord-${dist})*($y_coord-${dist})"
+sq_z="$z_coord*$z_coord"
+
+distance_vector="vector($z_coord, $y_coord, $z_coord)"
+radial_distance="sqrt($sq_x + $sq_y + $sq_z)"
+unit_vector="$distance_vector / $radial_distance"
+
+echo "--- setting ambient field $pvar = $pStat ----"
+funkySetFields -case . -field $pVar -expression "$pStat" -time $time -keepPatches >> log.setFields
+echo "... setting U=0 -----"
+funkySetFields -case . -field U -expression "0.0 * vector(0,1,0)" -time $time -keepPatches >> log.setFields
+
+echo "---- setting alpha1 field for a bubble with R = $R at D_init = $dist ----"
+funkySetFields -case . -field alpha1 -expression "0.5*(tanh(($radial_distance-${R})*5.9/${width})+1)"\
+                    -time $time -keepPatches >> log.setFields  #-condition 'pos().x <= 50e-6' 
+
+echo "---- setting pressure with same energy for discretization ----"
+if [ $(python3 <<< "print($R > 0.0)") == "True" ]
+then
+    echo "-- reading real discretized alpha2-volume (0/alpha2_vol_t0)"
+    p_init=$pBubble
+    Vn=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${Rn}**(3.)  )')")
+    Vinit=$(m4 <<< "esyscmd(perl -e 'printf (   4.*${pi}/3.* ${R}**(3.)  )')")
+    Einit=$(m4 <<< "esyscmd(perl -e 'printf (   ($p_init * $Vinit - $pn * $Vn )/($gamma -1.) + $pStat*($Vinit - $Vn)  )')")
+    
+    get_alpha2_vol_t0 > log.get_alpha2_vol_t0
+    true_alpha2_vol=$(cat 0/alpha2_vol_t0)
+    if [ "_MESH-MESHDIMS" = "2D" ];then
+        if [ ! -e THETA ];then
+            echo "ERROR: alter your meshDict.m4 such that it writes theta into THETA"
+            exit 1
+        fi
+        theta=$(cat THETA)
+        Vinitdiscr=$(m4 <<< "esyscmd(perl -e 'printf (  $true_alpha2_vol *180./${theta}  )')")
+    elif [ "_MESH-MESHDIMS" = "1D" ];then
+        if [ ! -e THETA ];then
+            echo "ERROR: alter your meshDict.m4 such that it writes theta into THETA"
+            exit 1
+        fi
+        theta=$(cat THETA)
+        theta_rad=$(m4 <<< "esyscmd(perl -e 'printf (  ${theta}*${pi}/180.  )')")
+        Vinitdiscr=$(m4 <<< "esyscmd(perl -e 'use Math::Trig; printf (  ${true_alpha2_vol}*${pi}/(tan(${theta_rad}))**2  )')")
+    fi
+    
+    Rdiscr=$(m4 <<< "esyscmd(perl -e 'printf (   (${Vinitdiscr}/(4.*${pi})*3)**(1./3.)  )')")
+    p_initdiscr=$(m4 <<< "esyscmd(perl -e 'printf (   (($gamma -1.)*($Einit - $pStat*($Vinitdiscr-$Vn)) + $pn *$Vn )/$Vinitdiscr  )')")
+    echo "python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $Rdiscr -s $sigma --p0 $p_initdiscr"
+    Rndiscr=$(python get_true_Rn_from_R0_p0_Rn_sigma.py --R0 $Rdiscr -s $sigma --p0 $p_initdiscr --pinf $pStat )
+    echo $Rndiscr > Rn_export
+    pndiscr=$(m4 <<< "esyscmd(perl -e 'printf (${pStat} + 2.*${sigma}/${Rndiscr}   )')")
+    echo "R_0new           = $R "
+    echo "R_n_new          = $Rndiscr "
+    echo "pBubble_old      = $pBubble"
+    echo "pBubble_new      = $p_initdiscr "
+    funkySetFields -case . -field $pVar -expression "${p_initdiscr}*(1.-alpha1)+${pVar}*alpha1"\
+                -time $time -keepPatches >> log.setFields
+    pBubble=$p_initdiscr
+    Rn=$Rndiscr
+    pn=$pndiscr
+fi
+
+
+
+#-----------------passiveScalar part: -------------------
+echo "---- setting passiveScalar part as linear ramp ----"
+funkySetFields -case . -field passiveScalar -expression "pos().x" -time 0 -keepPatches >> log.setFields
+#---------------------------------------------------------
+
+###############################################
+###############################################
+if [[ "_DECOMPOSE-METHOD" == "manual" ]]
+then
+    python _DECOMPOSE-MANUALSCRIPT
+    #cp constant/cellDist 0/
+    #sed -i "s/constant/0/g" 0/cellDist
+fi
+
+
+
+if [ $parallel ];then
+    echo "decomposing with xyz: _DECOMPOSE-XYZ by method: _DECOMPOSE-METHOD"
+    decomposePar > log.decomposePar
+
+
+    if [ ! -d processor0/constant/polyMesh ]
+    then
+        echo "writing mesh to processor*/constant because it wasn't created..."
+        for coreDir in processor*; do 
+            mkdir -p $coreDir/constant
+            mv $coreDir/0/polyMesh $coreDir/constant
+            rm -rf $coreDir/0
+        done
+    fi
+
+
+    threads=$(grep "^numberOfSubdomains" system/decomposeParDict | sed "s/^numberOfSubdomains *\([0-9]*\);/\1/")
+    method=$( grep "^method" system/decomposeParDict | sed "s/^method *\([a-zA-Z]*\);/\1/")
+    echo "slots = ${threads}, decomposed with $method"
+    if [ -e constant/dynamicMeshDict ]
+    then
+        for i in proc*
+        do
+            cp constant/dynamicMeshDict $i/constant/
+        done
+    fi
+fi
+
+echo "preparation of the case needed time:"
+echo "from $start"
+echo "till $(date)"
+echo "----- DONE creating case -----"
+
+# ----------------------------------------------------------------- end-of-file
