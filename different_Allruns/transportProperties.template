@@ -19,7 +19,7 @@ gas
 {
     mu                   mu    [1 -1 -1 0 0 0 0] _GAS-MU;
     gamma                gamma [0 0 0 0 0 0 0] _GAS-GAMMA;
-    beta                 beta  [0 0 0 0 0 0 0] _GAS-BETA;
+    beta                 beta  [0 0 0 0 0 0 0] 0.0;
     Rn                   Rn    [0 1 0 0 0 0 0] _BUBBLE-RN;
     aimedRn            aimedRn [0 1 0 0 0 0 0] _ALLRUN-AIMEDRN;
     pMin                 pMin  [1 -1 -2 0 0 0 0] _GAS-PMIN; // 2337;
