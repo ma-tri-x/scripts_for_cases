@@ -18,12 +18,8 @@ def main():
         a2  = float(sys.argv[3])
         a3  = float(sys.argv[4])
         a4  = float(sys.argv[5])
-        a5  = float(sys.argv[6])
-        a6  = float(sys.argv[7])
-        a7  = float(sys.argv[8])
-        a8  = float(sys.argv[9])
     except:
-        print("usage: python3 {} RE a1 a2 a3 a4 a5 a6 a7 a8".format(sys.argv[0]))
+        print("usage: python3 {} RE a1 a2 a3 a4".format(sys.argv[0]))
         print("RE = Rn")
         exit(1)
     
