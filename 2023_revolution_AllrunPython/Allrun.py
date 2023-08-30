@@ -4,10 +4,15 @@ import os, sys, argparse, glob, time
 import numpy as np
 import OFAllFunctionLibrary as OAFL
 import subprocess
+from meshespython import coreCartRegUnbound
 
 def main():
     case = OAFL.Case()
-    case.m4Mesh()
+    
+    mesh = coreCartRegUnbound.MeshCalcer()
+    mesh.calc_mesh()
+    mesh.write_blockMeshDict()
+    
     case.blockMesh()
 
 if __name__=="__main__":

@@ -3,6 +3,7 @@
 import os, sys, argparse, glob, time
 import numpy as np
 import subprocess, json, shutil
+#from meshespython import AbcMesh
 
 class Case(object):
     def __init__(self,pVar="p_rgh",rho2tildeVar="rho_gTilde"):
@@ -79,6 +80,10 @@ class Case(object):
         print("pn      = {} ".format(self.pn))
         print("pBubble = {} ".format(self.pBubble))
     
+    def Allclean(self):
+        stdout,stderr = self._run_system_command("bash Allclean")
+        print(stdout,stderr)
+    
     def store_solver_commit_number(self):
         os.chdir(os.path.join(self.my_env["WM_PROJECT_USER_DIR"],"localMassCorr_working"))
         version_number,_ = self._run_system_command("git log")
@@ -113,13 +118,19 @@ class Case(object):
         shutil.copy2("0/backup/U","0/U")
         shutil.copy2("0/backup/passiveScalar.org","0/passiveScalar")
         if os.path.isdir("CAD"):
-            self._run_system_command("mkdir -p constant/triSurface")
-            shutil.copy2("CAD/{}".format(self.conf_dict["CAD"]["object"]),"constant/triSurface/")
+            try:
+                os.mkdir("constant/triSurface")
+                shutil.copy2("CAD/{}".format(self.conf_dict["CAD"]["object"]),"constant/triSurface/")
+            except:
+                pass
         
     def determine_bubble_center(self):
         offset = 0.0
-        if self.conf_dict["bubble"]["doubleBubble"]:
-            offset = - self.conf_dict["bubble"]["D_init"]
+        try:
+            if self.conf_dict["bubble"]["doubleBubble"]:
+                offset = - self.conf_dict["bubble"]["D_init"]
+        except(KeyError):
+            pass
         return offset
     
     def m4Mesh(self):
@@ -240,7 +251,7 @@ class Case(object):
         L6 = f"{a6}*0.0625*(231*pow(cos({theta}),6)-315*pow(cos({theta}),4)+105*pow(cos({theta}),2)-5)"
         L7 = f"{a7}*0.0625*(429*pow(cos({theta}),7)-693*pow(cos({theta}),5)+315*pow(cos({theta}),3)-35*cos({theta}))"
         L8 = f"{a8}*0.0078125*(6435*pow(cos({theta}),8)-12012*pow(cos({theta}),6)+6930*pow(cos({theta}),4)-1260*pow(cos({theta}),2)+35)"
-        expression = f"{sq_x} + {sq_y} < ({L0}+{L2}}+{L3}+{L4}+{L5}+{L6}+{L7}+{L8})*({L0}+{L2}+{L3}+{L4}+{L5}+{L6}+{L7}+{L8})?0:1"
+        expression = f"{sq_x} + {sq_y} < ({L0}+{L2}+{L3}+{L4}+{L5}+{L6}+{L7}+{L8})*({L0}+{L2}+{L3}+{L4}+{L5}+{L6}+{L7}+{L8})?0:1"
         self.run_funkySetFields_command("alpha1",expression,"")
         
     def get_alpha2_vol_t0(self):
@@ -338,5 +349,198 @@ class Case(object):
         self.run_funkySetFields_command(self.pVar,expression,"")
         self.pBubble = p_initdiscr
         self.R0 = Rdiscr
+        
+    def set_passiveScalar_layeredColors(self):
+        Y = 1.5 * self.Rmax + self.bubble_center
+        print(f"---- passiveScalar part till Y: {Y} ----")
+        self.run_funkySetFields_command("passiveScalar","1.0","")
+        self.run_funkySetFields_command("passiveScalar",f"{y_coord}/{Y}",f"{y_coord} < {Y} ")
+
+    def decompose(self):
+        method = self.conf_dict["decompose"]["method"]
+        threads = self.conf_dict["decompose"]["threads"]
+        xyz = self.conf_dict["decompose"]["xyz"]
+        
+        print(f"decomposing with xyz: {xyz} by method: {method}")
+        
+        stdout,stderr = self._run_system_command("decomposePar")
+        with open("log.decomposePar","w") as f:
+            f.write(stdout)
+            f.write(stderr)
+
+        procDirs = glob.glob("processor*")
+        
+        if not os.path.isdir("processor0/constant/polyMesh"):
+            print("writing mesh to processor*/constant because it wasn't created...")
+            for coreDir in procDirs:
+                os.mkdir(os.path.join(coreDir,"constant"))
+                shutil.move(os.path.join(coreDir,"0/polyMesh"),os.path.join(coreDir,"constant"))
+                os.removedirs(os.path.join(coreDir,"0"))
+
+        print(f"slots = {threads}, decomposed with {method}")
+        
+        if os.path.isfile("constant/dynamicMeshDict"):
+            for coreDir in procDirs:
+                shutil.copy2("constant/dynamicMeshDict",os.path.join(coreDir,"constant"))
+        
+        os.mkdir("constant/polyMesh/temp")
+        shutil.move("constant/polyMesh/*.gz","constant/polyMesh/temp")
+        shutil.move("constant/polyMesh/boundary","constant/polyMesh/temp")
+        
+        
+        
+        
+        
+        
+        
+        
+class Mesh(Case):
+    def __init__(self):
+        super().__init__(pVar="p_rgh",rho2tildeVar="rho_gTilde")
+        self.header = """
+        /*--------------------------------*- C++ -*----------------------------------*\
+        | =========                 |                                                 |
+        | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+        |  \\    /   O peration     | Version:  2.0.0                                 |
+        |   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+        |    \\/     M anipulation  |                                                 |
+        \*---------------------------------------------------------------------------*/
+
+        FoamFile
+        {
+            version         2.0;
+            format          ascii;
+        
+            root            "";
+            case            "";
+            instance        "";
+            local           "";
+        
+            class           dictionary;
+            object          blockMeshDict;
+        }
+        
+        // * * * * * * * * Max Koch Mesh made with Python  * * * * * * * * * * * * * //
+        """
+        self.sketch = ""
+        self.origin = self.bubble_center
+        self.vertices = {}
+        self.blocks = {}
+        self.edges = {}
+        self.patches = {}
+        self.mergePatchPairs = {}
+        self.vertexNumber = 0
+        self.mesh_python = [] # list will/should contain only one entry, the instance of AbcMesh
+        
+    def add_mesh_python(self, mesh_python):
+        if not isinstance(mesh_python, AbcMesh):
+            raise TypeError('mesh_python doesn\'t match AbcMesh class.')
+        else:
+            self.mesh_python.append(mesh_python)
+    
+    def write_blockMeshDict(self):
+        self.write_header()
+        self.write_sketch()
+        self.write_vertices()
+        self.write_blocks()
+        self.write_edges()
+        self.write_patches()
+        self.write_mergePatchPairs()
+        
+        
+    def add_vertex(self,name,xyz):
+        self.vertices[name] = {}
+        self.vertices[name]["number"] = self.vertexNumber
+        self.vertices[name]["coords"] = "({} {} {})  //# {} {}".format(xyz[0],xyz[1],xyz[2],self.vertexNumber,name)
+        self.vertexNumber = self.vertexNumber + 1
+    
+    def add_block(self,name,vertices_names,cell_amounts,gradings):
+        self.blocks[name] = {}
+        self.blocks[name]["coords"] = "hex ({} {} {} {}   {} {} {} {})".format(self.vertices[vertices_names[0]]["number"],
+                                                                               self.vertices[vertices_names[1]]["number"],
+                                                                               self.vertices[vertices_names[2]]["number"],
+                                                                               self.vertices[vertices_names[3]]["number"],
+                                                                               self.vertices[vertices_names[4]]["number"],
+                                                                               self.vertices[vertices_names[5]]["number"],
+                                                                               self.vertices[vertices_names[6]]["number"],
+                                                                               self.vertices[vertices_names[7]]["number"])
+        self.blocks[name]["cell_amounts"] = " ({} {} {})".format(cell_amounts[0],
+                                                                 cell_amounts[1],
+                                                                 cell_amounts[2])
+        self.blocks[name]["gradings"] = "simpleGrading ({} {} {}) //# {}".format(gradings[0],
+                                                                                 gradings[1],
+                                                                                 gradings[2],
+                                                                                 name)
+        
+    def add_edge(self,name,edge_type,name_point1,name_point2,xyz):
+        self.edges[name] = {}
+        self.edges[name]["edge_type"] = edge_type
+        self.edges[name]["name_point1"] = name_point1
+        self.edges[name]["name_point2"] = name_point2
+        self.edges[name]["coords"] = "({} {} {})  //# {}".format(xyz[0],xyz[1],xyz[2],name)
+    
+    def add_patch(self,patch_type,name):
+        self.patches[name] = {}
+        self.patches[name]["patch_type"] = patch_type
+        self.patches[name]["faces"] = {}
+        
+    def add_face_to_patch(self,name,patch_name,names_points):
+        self.patches[patch_name]["faces"][name] = "({} {} {} {}) //# {}".format(self.vertices[names_points[0]]["number"],
+                                                                                self.vertices[names_points[1]]["number"],
+                                                                                self.vertices[names_points[2]]["number"],
+                                                                                self.vertices[names_points[3]]["number"],
+                                                                                name)
+    
+    def write_header(self):
+        with open("constant/polyMesh/blockMeshDict","w") as f:
+            f.write(self.header)
+    
+    def write_sketch(self):
+        with open("constant/polyMesh/blockMeshDict","a") as f:
+            f.write(self.sketch)
+            
+    def write_vertices(self):
+        with open("constant/polyMesh/blockMeshDict","a") as f:
+            f.write("\nvertices\n(\n")
+            for vertex in self.vertices:
+                f.write("    {}\n".format(self.vertices[vertex]["coords"]))
+            f.write(");\n\n")
+    
+    def write_blocks(self):
+        with open("constant/polyMesh/blockMeshDict","a") as f:
+            f.write("\nblocks\n(\n")
+            for block in self.blocks:
+                f.write("    {} {} {}\n".format(self.blocks[block]["coords"],
+                                                self.blocks[block]["cell_amounts"],
+                                                self.blocks[block]["gradings"]))
+            f.write(");\n\n")
+            
+    def write_edges(self):
+        with open("constant/polyMesh/blockMeshDict","a") as f:
+            f.write("\nedges\n(\n")
+            for edge in self.edges:
+                f.write("    {} {} {} {}\n".format(self.edges[edge]["edge_type"],
+                                                   self.edges[edge]["name_point1"],
+                                                   self.edges[edge]["name_point2"],
+                                                   self.edges[edge]["coords"]))
+            f.write(");\n\n")
+    
+    def write_patches(self):
+        with open("constant/polyMesh/blockMeshDict","a") as f:
+            f.write("\npatches\n(\n")
+            for patch in self.patches:
+                f.write("    {} {}\n    (\n".format(self.patches[patch]["patch_type"],
+                                                    patch))
+                for face in self.patches[patch]["faces"]:
+                    f.write("        {}\n".format(self.patches[patch]["faces"][face]))
+                f.write("    )\n\n")
+            f.write(");\n\n")
+            
+    def write_mergePatchPairs(self):
+        with open("constant/polyMesh/blockMeshDict","a") as f:
+            f.write("\nmergePatchPairs\n(\n);\n")
+    
+        
+        
         
         
