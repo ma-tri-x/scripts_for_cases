@@ -520,8 +520,8 @@ class Mesh(Case):
             f.write("\nedges\n(\n")
             for edge in self.edges:
                 f.write("    {} {} {} {}\n".format(self.edges[edge]["edge_type"],
-                                                   self.edges[edge]["name_point1"],
-                                                   self.edges[edge]["name_point2"],
+                                                   self.vertices[self.edges[edge]["name_point1"]]["number"],
+                                                   self.vertices[self.edges[edge]["name_point2"]]["number"],
                                                    self.edges[edge]["coords"]))
             f.write(");\n\n")
     

@@ -2,3 +2,4 @@ utility_get_alpha2_vol_t0/Make/linux*
 utility_get_bubble_y_distance/Make/linux*
 *.pyc
 *temp.*
+*__pycache__

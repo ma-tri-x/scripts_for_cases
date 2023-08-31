@@ -4,7 +4,7 @@ import os, sys, argparse, glob, time
 import numpy as np
 import OFAllFunctionLibrary as OAFL
 import subprocess
-from meshespython import coreCartRegUnbound
+from meshespython import *
 
 def main():
     case = OAFL.Case()
