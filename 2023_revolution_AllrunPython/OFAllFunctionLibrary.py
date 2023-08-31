@@ -92,9 +92,9 @@ class Case(object):
             f.write(version_number.split("\n")[0])
             
     def _run_system_command(self,cmd):
-        a = subprocess.run(cmd.split(" "),capture_output=True)
-        stdout = a.stdout.decode('utf-8')
-        stderr = a.stderr.decode('utf-8')
+        a = subprocess.run(cmd.split(" "),capture_output=True, universal_newlines=True)
+        stdout = a.stdout
+        stderr = a.stderr
         if not a.returncode == 0:
             print("Error in subprocess {}".format(cmd))
             print(a.stdout)
@@ -178,12 +178,14 @@ class Case(object):
         self.copy_0backup()
         
     def run_funkySetFields_command(self,field,expression,condition):
-        if not condition == "":
-            a = subprocess.run(["funkySetFields","-case .",f"-field {field}",f"-expression \"{expression}\"",f"-condition \"{condition}\"",f"-time {self.startTime}"],capture_output=True)
-        else:
-            a = subprocess.run(["funkySetFields","-case .",f"-field {field}",f"-expression \"{expression}\"",f"-time {self.startTime}"],capture_output=True)
-        stdout = a.stdout.decode('utf-8')
-        stderr = a.stderr.decode('utf-8')
+        cmd = ["funkySetFields","-case", ".","-field", f"{field}","-expression", expression,"-condition",condition,"-time" ,f"{self.startTime}","-keepPatches"]
+        if condition == "":
+            cmd = ["funkySetFields","-case", ".","-field", f"{field}","-expression", expression,"-time" ,f"{self.startTime}","-keepPatches"]
+        a = subprocess.run(cmd,capture_output=True, universal_newlines=True)
+        #stdout = str(a.stdout.decode('utf-8')).replace("\\n","\n")
+        #stderr = str(a.stderr.decode('utf-8')).replace("\\n","\n")
+        stdout = a.stdout
+        stderr = a.stderr
         if not a.returncode == 0:
             print("Error in subprocess {}".format(cmd))
             print(a.stdout)
@@ -200,14 +202,15 @@ class Case(object):
     
     def set_alpha_field_bubble(self):
         print(f"---- setting alpha1 field for a bubble with R0 = {self.R0} at D_init = {self.D_init} ----")
-        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{self.R0})*5.9/${self.widthOfInterface})+1)","",0.0)
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{self.R0})*5.9/{self.widthOfInterface})+1)","",0.0)
         
     def set_alpha_field_ellipse(self):
+        print("----- setting alpha1 field ellipse ------")
         alpha = self.conf_dict["bubble"]["excentricity"]
         e_x = alpha
         Ry = self.R0 / e_x**(2/3)
         Rx = Ry * e_x
-        expression=f"{sq_x} + {sq_y}*{e_x}*{e_x} < {Rx} * {Rx} ?0:1"
+        expression=f"{self.sq_x} + {self.sq_y}*{e_x}*{e_x} < {Rx} * {Rx} ?0:1"
         self.run_funkySetFields_command("alpha1",expression,"")        
         
     def get_correct_a0_from_Rn_and_coeffs(self):
@@ -317,7 +320,7 @@ class Case(object):
         print("R_n_new     = {}".format(Rndiscr))
         print("pBubble_old = {}".format(pBubble))
         print("pBubble_new = {}".format(p_initdiscr))
-        expression = f"{p_initdiscr}*(1.-alpha1)+${self.pVar}*alpha1"
+        expression = f"{p_initdiscr}*(1.-alpha1)+{self.pVar}*alpha1"
         self.run_funkySetFields_command(self.pVar,expression,"")
         self.pBubble = p_initdiscr
         self.Rn = Rndiscr
@@ -326,7 +329,6 @@ class Case(object):
         
     def adapt_pV(self):
         print("---- setting pressure with same adiabatic constant for discretization ----")
-        print("-- reading real discretized alpha2-volume (0/alpha2_vol_t0)")
         true_alpha2_vol = self.get_alpha2_vol_t0()
         Vinitdiscr = true_alpha2_vol
         
@@ -342,10 +344,9 @@ class Case(object):
         adiabaticConstant = self.pBubble * self.R0**(3.*self.gamma)
         p_initdiscr = adiabaticConstant / (Rdiscr**(3.*self.gamma))
         print("R_0new      = {}".format(self.R0))
-        print("R_n_new     = {}".format(Rndiscr))
-        print("pBubble_old = {}".format(pBubble))
+        print("pBubble_old = {}".format(self.pBubble))
         print("pBubble_new = {}".format(p_initdiscr))
-        expression = f"{p_initdiscr}*(1.-alpha1)+${self.pVar}*alpha1"
+        expression = f"{p_initdiscr}*(1.-alpha1)+{self.pVar}*alpha1"
         self.run_funkySetFields_command(self.pVar,expression,"")
         self.pBubble = p_initdiscr
         self.R0 = Rdiscr
@@ -354,7 +355,7 @@ class Case(object):
         Y = 1.5 * self.Rmax + self.bubble_center
         print(f"---- passiveScalar part till Y: {Y} ----")
         self.run_funkySetFields_command("passiveScalar","1.0","")
-        self.run_funkySetFields_command("passiveScalar",f"{y_coord}/{Y}",f"{y_coord} < {Y} ")
+        self.run_funkySetFields_command("passiveScalar",f"{self.y_coord}/{Y}",f"{self.y_coord} < {Y} ")
 
     def decompose(self):
         method = self.conf_dict["decompose"]["method"]
@@ -373,19 +374,37 @@ class Case(object):
         if not os.path.isdir("processor0/constant/polyMesh"):
             print("writing mesh to processor*/constant because it wasn't created...")
             for coreDir in procDirs:
-                os.mkdir(os.path.join(coreDir,"constant"))
-                shutil.move(os.path.join(coreDir,"0/polyMesh"),os.path.join(coreDir,"constant"))
+                self._mkdir_if_not_exists(os.path.join(coreDir,"constant"))
+                self._move_file_if_exists(os.path.join(coreDir,"0/polyMesh"),os.path.join(coreDir,"constant"))
                 os.removedirs(os.path.join(coreDir,"0"))
 
         print(f"slots = {threads}, decomposed with {method}")
         
         if os.path.isfile("constant/dynamicMeshDict"):
             for coreDir in procDirs:
-                shutil.copy2("constant/dynamicMeshDict",os.path.join(coreDir,"constant"))
+                self._copy_file_if_exists("constant/dynamicMeshDict",os.path.join(coreDir,"constant"))
         
-        os.mkdir("constant/polyMesh/temp")
-        shutil.move("constant/polyMesh/*.gz","constant/polyMesh/temp")
-        shutil.move("constant/polyMesh/boundary","constant/polyMesh/temp")
+        self._mkdir_if_not_exists("constant/polyMesh/temp")
+        self._move_file_if_exists("constant/polyMesh/*.gz","constant/polyMesh/temp")
+        self._move_file_if_exists("constant/polyMesh/boundary","constant/polyMesh/temp")
+        
+    def _move_file_if_exists(self,afile,bdir):
+        l = glob.glob(afile)
+        if not os.path.isdir(bdir):
+            os.mkdir(bdir)
+        if l: 
+            for i in l:
+                filename = i.split("/")[-1]
+                shutil.move(i,os.path.join(bdir,filename)) # without filename in dest, not overwritten 
+        
+    def _mkdir_if_not_exists(self,thedir):
+        if not os.path.isdir(thedir):
+            os.mkdir(thedir)
+    
+    def _copy_file_if_exists(self,thefile,destdir):
+        if os.path.isfile(thefile):
+            self._mkdir_if_not_exists(destdir)
+            shutil.copy2(thefile,destdir)
         
         
         
