@@ -316,7 +316,7 @@ class Case(object):
         print("adapting Rn...")
         Rndiscr = self._Newton_find_Rn(self,p_initdiscr,Rdiscr,self.Rn)
         pndiscr = self.pInf + 2.*self.sigma/Rndiscr - pV
-        print("R_0new      = {}".format(self.R0))
+        print("R_0new      = {}".format(Rdiscr))
         print("R_n_new     = {}".format(Rndiscr))
         print("pBubble_old = {}".format(pBubble))
         print("pBubble_new = {}".format(p_initdiscr))
@@ -343,7 +343,7 @@ class Case(object):
         Rdiscr = (Vinitdiscr / (4.*np.pi)*3)**(1./3.)
         adiabaticConstant = self.pBubble * self.R0**(3.*self.gamma)
         p_initdiscr = adiabaticConstant / (Rdiscr**(3.*self.gamma))
-        print("R_0new      = {}".format(self.R0))
+        print("R_0new      = {}".format(Rdiscr))
         print("pBubble_old = {}".format(self.pBubble))
         print("pBubble_new = {}".format(p_initdiscr))
         expression = f"{p_initdiscr}*(1.-alpha1)+{self.pVar}*alpha1"

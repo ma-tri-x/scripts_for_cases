@@ -9,7 +9,7 @@ class MeshCalcer(OAFL.Mesh):
         super().__init__()
         self.theta = self.conf_dict["mesh"]["theta"]
         self.Xi = self.conf_dict["mesh"]["meshCoreSize"]
-        self.Xii = 2.0 * np.sqrt(2)*self.Xi
+        self.Xii = 1.6 * np.sqrt(2)*self.Xi
         self.X = self.conf_dict["mesh"]["factorBubbleDomainRmax"] * self.Rmax
         self.XF = self.conf_dict["mesh"]["domainSizeFactorRmax"] * self.Rmax
         self.cellSize = self.conf_dict["mesh"]["cellSize"]
@@ -77,7 +77,10 @@ class MeshCalcer(OAFL.Mesh):
         cell_amounts_xy = [num_phi,num_r]
         phi_left = -90.
         phi_right = -45.
-        if not name_of_inner_layer == "A": A = f"{name_of_inner_layer}1"
+        first_layer = True
+        if not name_of_inner_layer == "A": 
+            A = f"{name_of_inner_layer}1"
+            first_layer = False
         self.attach_radial_block_to_the_bottom(f"{B}1",f"{A}",radius,
                                                cell_amounts_xy,
                                                grading_x,
@@ -87,22 +90,32 @@ class MeshCalcer(OAFL.Mesh):
         cell_amounts_xy = [num_r,2*num_phi]
         phi_top = 45.
         phi_bottom = -45.0
-        if not name_of_inner_layer == "A": A = f"{name_of_inner_layer}2"
-        self.attach_radial_block_to_the_right(f"{B}2",f"{A}",radius,
-                                              cell_amounts_xy,
-                                              grading_x,
-                                              phi_top,phi_bottom,
-                                              add_side=add_side)
+        ThirdBlock = f"{name_of_inner_layer}1"
+        if not name_of_inner_layer == "A": 
+            A = f"{name_of_inner_layer}2"
+            first_layer = False
+        self.attach_radial_block_to_the_center_right(f"{B}2",f"{B}1",f"{A}",radius,
+                                                  cell_amounts_xy,
+                                                  grading_x,
+                                                  phi_top,phi_bottom,
+                                                  add_side=add_side,
+                                                  first_layer=first_layer,
+                                                  name_of_other_block_bottomleft=ThirdBlock)
 
         cell_amounts_xy = [num_phi,num_r]
         phi_left = 90.
         phi_right = 45.
-        if not name_of_inner_layer == "A": A = f"{name_of_inner_layer}3"
-        self.attach_radial_block_to_the_top(f"{B}3",f"{A}",radius,
-                                               cell_amounts_xy,
-                                               grading_x,
-                                               phi_left,phi_right,
-                                               add_empty=True,add_side=add_side)
+        ThirdBlock = f"{name_of_inner_layer}2"
+        if not name_of_inner_layer == "A": 
+            A = f"{name_of_inner_layer}3"
+            first_layer = False
+        self.attach_radial_block_to_the_top_left(f"{B}3",f"{B}2",f"{A}",radius,
+                                                 cell_amounts_xy,
+                                                 grading_x,
+                                                 phi_left,phi_right,
+                                                 add_empty=True,add_side=add_side,
+                                                 first_layer=first_layer,
+                                                 name_of_other_block_bottomright=ThirdBlock)
         
         
     def add_core_unbound(self):
@@ -186,32 +199,47 @@ class MeshCalcer(OAFL.Mesh):
                                                          vertex_5_name])
         
     
-    def attach_radial_block_to_the_right(self,name,
-                                         name_of_other_block,
+    def attach_radial_block_to_the_center_right(self,name,
+                                         name_of_other_block_bottom,
+                                         name_of_other_block_left,
                                          X_right_radius,
                                          cell_amounts_xy,
                                          grading_x,
                                          phi_top,
                                          phi_bottom,
-                                         add_side=False):
+                                         add_side=False,
+                                         first_layer=True,
+                                         name_of_other_block_bottomleft="B1"):
         #left-down-front  right-top-back (in xyz language)
         cell_amounts = [cell_amounts_xy[0],1,cell_amounts_xy[1]]
         gradings = [grading_x,1,1]
-        leftname = name_of_other_block
+        leftname = name_of_other_block_left
+        bottomname = name_of_other_block_bottom
+        bottomleftname = name_of_other_block_bottomleft
         X = X_right_radius
         #
-        vertex_1_name = f"{leftname}rdf"
-        vertex_2_name, vertex_2_xyz = f"{name}rdf", [self.GCPx(X,phi_bottom),self.GCPy(X,phi_bottom), self.GCPz(X,phi_bottom)]
-        vertex_3_name, vertex_3_xyz = f"{name}rdb", [self.GCPx(X,phi_bottom),self.GCPy(X,phi_bottom),-self.GCPz(X,phi_bottom)]
-        vertex_4_name = f"{leftname}rdb"
-        vertex_5_name = f"{leftname}rtf"
-        vertex_6_name, vertex_6_xyz = f"{name}rtf", [self.GCPx(X,phi_top),self.GCPy(X,phi_top), self.GCPz(X,phi_top)]
-        vertex_7_name, vertex_7_xyz = f"{name}rtb", [self.GCPx(X,phi_top),self.GCPy(X,phi_top),-self.GCPz(X,phi_top)]
-        vertex_8_name = f"{leftname}rtb"
-        self.add_vertex(vertex_2_name, vertex_2_xyz)
-        self.add_vertex(vertex_3_name, vertex_3_xyz)
-        self.add_vertex(vertex_6_name, vertex_6_xyz)
-        self.add_vertex(vertex_7_name, vertex_7_xyz)
+        if first_layer:
+            vertex_1_name = f"{leftname}rdf"
+            vertex_2_name = f"{bottomname}rdf"
+            vertex_3_name = f"{bottomname}rdb"
+            vertex_4_name = f"{leftname}rdb"
+            vertex_5_name = f"{leftname}rtf"
+            vertex_6_name, vertex_6_xyz = f"{name}rtf", [self.GCPx(X,phi_top),self.GCPy(X,phi_top), self.GCPz(X,phi_top)]
+            vertex_7_name, vertex_7_xyz = f"{name}rtb", [self.GCPx(X,phi_top),self.GCPy(X,phi_top),-self.GCPz(X,phi_top)]
+            vertex_8_name = f"{leftname}rtb"
+            self.add_vertex(vertex_6_name, vertex_6_xyz)
+            self.add_vertex(vertex_7_name, vertex_7_xyz)
+        else:
+            vertex_1_name = f"{bottomleftname}rdf"
+            vertex_2_name = f"{bottomname}rdf"
+            vertex_3_name = f"{bottomname}rdb"
+            vertex_4_name = f"{bottomleftname}rdb"
+            vertex_5_name = f"{leftname}rtf"
+            vertex_6_name, vertex_6_xyz = f"{name}rtf", [self.GCPx(X,phi_top),self.GCPy(X,phi_top), self.GCPz(X,phi_top)]
+            vertex_7_name, vertex_7_xyz = f"{name}rtb", [self.GCPx(X,phi_top),self.GCPy(X,phi_top),-self.GCPz(X,phi_top)]
+            vertex_8_name = f"{leftname}rtb"
+            self.add_vertex(vertex_6_name, vertex_6_xyz)
+            self.add_vertex(vertex_7_name, vertex_7_xyz)
         
         self.add_block(name,[vertex_1_name,
                              vertex_2_name,
@@ -249,33 +277,49 @@ class MeshCalcer(OAFL.Mesh):
                                                           vertex_7_name,
                                                           vertex_6_name])
                                                     
-    def attach_radial_block_to_the_top(self,name,
-                                       name_of_other_block,
-                                       X_top_radius,
-                                       cell_amounts_xy,
-                                       grading_x,
-                                       phi_left,
-                                       phi_right,
-                                       add_empty=True,
-                                       add_side=False):
+    def attach_radial_block_to_the_top_left(self,name,
+                                         name_of_other_block_right,
+                                         name_of_other_block_bottom,
+                                         X_top_radius,
+                                         cell_amounts_xy,
+                                         grading_x,
+                                         phi_left,
+                                         phi_right,
+                                         add_empty=True,
+                                         add_side=False,
+                                         first_layer=True,
+                                         name_of_other_block_bottomright="B2"):
         #left-down-front  right-top-back (in xyz language)
         cell_amounts = [cell_amounts_xy[0],1,cell_amounts_xy[1]]
         gradings = [1,1,grading_x]
-        bottomname = name_of_other_block
+        rightname = name_of_other_block_right
+        bottomname = name_of_other_block_bottom
+        bottomrightname = name_of_other_block_bottomright
         X = X_top_radius
         #
-        vertex_1_name = f"{bottomname}ltf"
-        vertex_2_name = f"{bottomname}rtf"
-        vertex_3_name = f"{bottomname}rtb"
-        vertex_4_name = f"{bottomname}ltb"
-        vertex_5_name, vertex_5_xyz = f"{name}ltf", [self.GCPx(X, phi_left),self.GCPy(X, phi_left), self.GCPz(X, phi_left)]  
-        vertex_6_name, vertex_6_xyz = f"{name}rtf", [self.GCPx(X,phi_right),self.GCPy(X,phi_right), self.GCPz(X,phi_right)]
-        vertex_7_name, vertex_7_xyz = f"{name}rtb", [self.GCPx(X,phi_right),self.GCPy(X,phi_right),-self.GCPz(X,phi_right)]
-        vertex_8_name, vertex_8_xyz = f"{name}ltb", [self.GCPx(X, phi_left),self.GCPy(X, phi_left),-self.GCPz(X, phi_left)]
-        self.add_vertex(vertex_5_name, vertex_5_xyz)
-        self.add_vertex(vertex_6_name, vertex_6_xyz)
-        self.add_vertex(vertex_7_name, vertex_7_xyz)
-        self.add_vertex(vertex_8_name, vertex_8_xyz)
+        if first_layer:
+            vertex_1_name = f"{bottomname}ltf"
+            vertex_2_name = f"{bottomname}rtf"
+            vertex_3_name = f"{bottomname}rtb"
+            vertex_4_name = f"{bottomname}ltb"
+            vertex_5_name, vertex_5_xyz = f"{name}ltf", [self.GCPx(X, phi_left),self.GCPy(X, phi_left), self.GCPz(X, phi_left)]  
+            vertex_6_name = f"{rightname}rtf"
+            vertex_7_name = f"{rightname}rtb"
+            vertex_8_name, vertex_8_xyz = f"{name}ltb", [self.GCPx(X, phi_left),self.GCPy(X, phi_left),-self.GCPz(X, phi_left)]
+            self.add_vertex(vertex_5_name, vertex_5_xyz)
+            self.add_vertex(vertex_8_name, vertex_8_xyz)
+        else:
+            vertex_1_name = f"{bottomname}ltf"
+            vertex_2_name = f"{bottomrightname}rtf"
+            vertex_3_name = f"{bottomrightname}rtb"
+            vertex_4_name = f"{bottomname}ltb"
+            vertex_5_name, vertex_5_xyz = f"{name}ltf", [self.GCPx(X, phi_left),self.GCPy(X, phi_left), self.GCPz(X, phi_left)]  
+            vertex_6_name = f"{rightname}rtf"
+            vertex_7_name = f"{rightname}rtb"
+            vertex_8_name, vertex_8_xyz = f"{name}ltb", [self.GCPx(X, phi_left),self.GCPy(X, phi_left),-self.GCPz(X, phi_left)]
+            self.add_vertex(vertex_5_name, vertex_5_xyz)
+            self.add_vertex(vertex_8_name, vertex_8_xyz)
+        
         
         self.add_block(name,[vertex_1_name,
                              vertex_2_name,
