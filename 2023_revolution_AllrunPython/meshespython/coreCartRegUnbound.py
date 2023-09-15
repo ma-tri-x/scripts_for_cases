@@ -5,13 +5,19 @@ import numpy as np
 import OFAllFunctionLibrary as OAFL
 
 class MeshCalcer(OAFL.Mesh):
-    def __init__(self):
-        super().__init__()
+    def __init__(self,conf_dict_json_loaded_as_dict):
+        super().__init__(conf_dict_json_loaded_as_dict)
         self.theta = self.conf_dict["mesh"]["theta"]
         self.Xi = self.conf_dict["mesh"]["meshCoreSize"]
         self.Xii = 1.6 * np.sqrt(2)*self.Xi
         self.X = self.conf_dict["mesh"]["factorBubbleDomainRmax"] * self.Rmax
+        if self.X < self.Xii:
+            print("bad mesh def. performing X=2*Xii")
+            self.X = 2.*self.Xii
         self.XF = self.conf_dict["mesh"]["domainSizeFactorRmax"] * self.Rmax
+        if self.XF < self.X:
+            print("bad mesh def. performing XF=2*X")
+            self.XF = 2.*self.X
         self.cellSize = self.conf_dict["mesh"]["cellSize"]
         self.gradingFactor = self.conf_dict["mesh"]["gradingFactor"]
         with open("THETA","w") as f:

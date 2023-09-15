@@ -2,7 +2,10 @@
 
 a_date=$(date)
 
-python3 temps_to_case_files.py
+## the following is included now in OFAllFunctionLibrary:
+# python3 temps_to_case_files.py
+
+# this wrapper script is only necessary to be backwards compatible with the alias orun
 
 python3 Allrun.py
 # 

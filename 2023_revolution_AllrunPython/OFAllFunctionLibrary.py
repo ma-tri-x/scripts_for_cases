@@ -2,11 +2,11 @@
 
 import os, sys, argparse, glob, time
 import numpy as np
-import subprocess, json, shutil
+import subprocess, json, shutil, re
 #from meshespython import AbcMesh
 
 class Case(object):
-    def __init__(self,pVar="p_rgh",rho2tildeVar="rho_gTilde"):
+    def __init__(self,conf_dict_loaded_as_dict,pVar="p_rgh",rho2tildeVar="rho_gTilde"):
         self.my_env = os.environ.copy()
         #if my_env["WM_PROJECT_DIR"]:
         try:
@@ -26,8 +26,9 @@ class Case(object):
         self.rho2tildeVar  = rho2tildeVar
         self.thisdir = os.path.dirname(os.path.abspath( __file__ ))
         
-        with open("conf_dict.json","r") as f:
-            self.conf_dict = json.load(f)
+        #with open("conf_dict.json","r") as f:
+            #self.conf_dict = json.load(f)
+        self.conf_dict = conf_dict_loaded_as_dict
         
         self.store_solver_commit_number()
         self.meshFile = "constant/polyMesh/{}".format(self.conf_dict["mesh"]["meshFile"])
@@ -130,7 +131,11 @@ class Case(object):
             if self.conf_dict["bubble"]["doubleBubble"]:
                 offset = - self.conf_dict["bubble"]["D_init"]
         except(KeyError):
-            pass
+            try:
+                if self.conf_dict["bubble"]["ycenter"]:
+                    offset = self.conf_dict["bubble"]["ycenter"]
+            except(KeyError):
+                pass
         return offset
     
     def m4Mesh(self):
@@ -405,6 +410,126 @@ class Case(object):
         if os.path.isfile(thefile):
             self._mkdir_if_not_exists(destdir)
             shutil.copy2(thefile,destdir)
+            
+    
+    """
+    including here the former rerun.py and later temps_to_case_files.py:
+    (*.template --> OF files)
+    """
+    def only_keep_template_paths(self, l):
+        c = []
+        for i in l:
+            if '.template' in i: c.append(i)
+        return c
+                
+    def find_all_variables_in_template(self, temp):
+        p = re.compile('_[A-Z0-9]+[-A-Z0-9_]+')
+        matches = []
+        with open(temp,'r') as f:
+            text = f.readlines()
+            for k in text:
+                matches.extend(p.findall(k))
+        self.remove_duplicates_from_list(matches)
+        return matches
+
+    def remove_duplicates_from_list(self, matches):
+        s = set([x for x in matches if matches.count(x) > 1])
+        for i in s:
+            j = matches.count(i)
+            for k in range(j-1):
+                matches.remove(i)
+                
+    def compare_found_to_dest(self, dest, var_list):
+        for i in var_list:
+            if dest.upper() == i[1:]:
+                return i
+
+    def replace_found_to_value(self, var_list):
+        for i,placeholder in enumerate(var_list):
+            if len(placeholder.split('-')) == 1:
+                for first_level_item in self.conf_dict:
+                    if first_level_item.upper() == placeholder[1:]:
+                        var_list[i] = self.conf_dict[first_level_item]
+            else:
+                for first_level_item in self.conf_dict:
+                    if first_level_item.upper() == placeholder.split('-')[0][1:]:
+                        for second_level_item in self.conf_dict[first_level_item]:
+                            if second_level_item.upper() == placeholder.split('-')[1]:
+                                var_list[i] = self.conf_dict[first_level_item][second_level_item]
+                                
+    def find_and_replace_variables_in_copied_templates(self, tree_less):
+        for copied_template in tree_less:
+            the_vars = self.find_all_variables_in_template(copied_template)
+            #print the_vars 
+            transl_vars = list(the_vars)
+            self.replace_found_to_value(transl_vars)
+            #print transl_vars 
+            with open(copied_template, 'r') as f:
+                content = f.read()
+            for i,var in enumerate(the_vars):
+                if transl_vars[i] is not None: content = content.replace(var, str(transl_vars[i]))
+            with open(copied_template, 'w') as f:
+                f.write(content)
+
+    def write_template_files_to_OF_files(self):        
+        tree1 = self.only_keep_template_paths(os.listdir('.'))
+        tree2 = self.only_keep_template_paths(os.listdir('./constant'))
+        tree2 = ['./constant/{}'.format(i) for i in tree2]
+        tree3 = self.only_keep_template_paths(os.listdir('./constant/polyMesh'))
+        tree3 = ['./constant/polyMesh/{}'.format(i) for i in tree3]
+        tree4 = self.only_keep_template_paths(os.listdir('./system'))
+        tree4 = ['./system/{}'.format(i) for i in tree4]
+        tree5 = self.only_keep_template_paths(os.listdir('./0'))
+        tree5 = ['./0/{}'.format(i) for i in tree5]
+        tree6 = self.only_keep_template_paths(os.listdir('./0/backup'))
+        tree6 = ['./0/backup/{}'.format(i) for i in tree6]
+        tree = tree1
+        tree.extend(tree2)
+        tree.extend(tree3)
+        tree.extend(tree4)
+        tree.extend(tree5)
+        tree.extend(tree6)
+        
+        tree_less = []
+        for i in tree: tree_less.append(i.split('.template')[0])
+        for i,j in enumerate(tree): shutil.copy2(j, tree_less[i])
+        
+        self.find_and_replace_variables_in_copied_templates(tree_less)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
         
         
         
@@ -414,8 +539,8 @@ class Case(object):
         
         
 class Mesh(Case):
-    def __init__(self):
-        super().__init__(pVar="p_rgh",rho2tildeVar="rho_gTilde")
+    def __init__(self,conf_dict_loaded_as_dict):
+        super().__init__(conf_dict_loaded_as_dict,pVar="p_rgh",rho2tildeVar="rho_gTilde")
         self.header = """
         /*--------------------------------*- C++ -*----------------------------------*\
         | =========                 |                                                 |
@@ -442,7 +567,7 @@ class Mesh(Case):
         // * * * * * * * * Max Koch Mesh made with Python  * * * * * * * * * * * * * //
         """
         self.sketch = ""
-        self.origin = self.bubble_center
+        self.origin = self.conf_dict["bubble"]["ycenter"]
         self.vertices = {}
         self.blocks = {}
         self.edges = {}
