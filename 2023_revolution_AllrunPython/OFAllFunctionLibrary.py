@@ -38,9 +38,12 @@ class Case(object):
         self.gamma = self.conf_dict["gas"]["gamma"]
         self.pV = self.conf_dict["transportProperties"]["pV"]
         self.pInf = self.conf_dict["liquid"]["pInf"]
-        self.Rn = self.conf_dict["bubble"]["Rn"] * (101315./self.pInf)**(1./3.) 
-        if self.conf_dict["bubble"]["dontCorrectRnToOneBar"]:
-            self.Rn = self.conf_dict["bubble"]["Rn"]
+        self.Rn = self.conf_dict["bubble"]["Rn"] * (101315./self.pInf)**(1./3.)
+        try:
+            if self.conf_dict["bubble"]["dontCorrectRnToOneBar"]:
+                self.Rn = self.conf_dict["bubble"]["Rn"]
+        except(KeyError):
+            print("if pInf != 101315: Rn corrected for pInf")
         self.sigma = self.conf_dict["transportProperties"]["sigma"]
         #BVAN=0.0000364 # m^3/mol
         self.mu_l = self.conf_dict["liquid"]["mu"]
@@ -82,8 +85,39 @@ class Case(object):
         print("pBubble = {} ".format(self.pBubble))
     
     def Allclean(self):
-        stdout,stderr = self._run_system_command("bash Allclean")
-        print(stdout,stderr)
+        #stdout,stderr = self._run_system_command("bash Allclean")
+        #print(stdout,stderr)
+        print("cleaning case ...")
+        geofile = glob.glob("*.geo")
+        if geofile:
+            self._mkdir_if_not_exists("geo")
+            for i in geofile:
+                shutil.move(i,"geo/")
+        
+        to_be_removed = glob.glob("processor*")
+        to_be_removed.extend(glob.glob("sets/"))
+        to_be_removed.extend(glob.glob("postProcessing/"))
+        to_be_removed.extend(glob.glob("0/p_rgh"))
+        to_be_removed.extend(glob.glob("0/alpha*"))
+        to_be_removed.extend(glob.glob("0/rho*"))
+        to_be_removed.extend(glob.glob("0/passiveScalar"))
+        to_be_removed.extend(glob.glob("0/U*"))
+        to_be_removed.extend(glob.glob("0/constant*"))
+        to_be_removed.extend(glob.glob("0/polyMesh*"))
+        to_be_removed.extend(glob.glob("0/*.gz"))
+        to_be_removed.extend(glob.glob("0/uniform"))
+        to_be_removed.extend(glob.glob("log.*"))
+        to_be_removed.extend(glob.glob("constant/polyMesh/sets"))
+        to_be_removed.extend(glob.glob("constant/triSurface"))
+        if self.conf_dict["mesh"]["execute_blockMesh"]:
+            to_be_removed.extend(glob.glob("constant/polyMesh/*.gz"))
+            to_be_removed.extend(glob.glob("constant/polyMesh/boundary"))
+        for item in to_be_removed:
+            if os.path.isdir(item):
+                shutil.rmtree(item)
+            if os.path.isfile(item):
+                os.remove(item)
+                
     
     def store_solver_commit_number(self):
         os.chdir(os.path.join(self.my_env["WM_PROJECT_USER_DIR"],"localMassCorr_working"))
@@ -120,10 +154,21 @@ class Case(object):
         shutil.copy2("0/backup/passiveScalar.org","0/passiveScalar")
         if os.path.isdir("CAD"):
             try:
-                os.mkdir("constant/triSurface")
+                self._mkdir_if_not_exists("constant/triSurface")
                 shutil.copy2("CAD/{}".format(self.conf_dict["CAD"]["object"]),"constant/triSurface/")
             except:
-                pass
+                print("WARNING: couldn't copy CAD/{}".format(self.conf_dict["CAD"]["object"]))
+    
+    def clear_polyMesh_for_Snappy(self):
+        content = glob.glob("constant/polyMesh/sets")
+        if content:
+            shutil.rmtree(content[0])
+        content = glob.glob("constant/polyMesh/cellLevel.gz")
+        if content:
+            os.remove(content[0])
+        content = glob.glob("constant/polyMesh/pointLevel.gz")
+        if content:
+            os.remove(content[0])
         
     def determine_bubble_center(self):
         offset = 0.0
@@ -170,13 +215,49 @@ class Case(object):
         self.nCellsCM = self._grep("log.checkMesh","cells:")[0].replace("cells:","")
         print("cells now: ",self.nCellsCM)
         
-    def snappyHexMesh(self):
+    def change_obj_file_to_meter(self):
+        geometry = self.conf_dict["CAD"]["object"]
+        thefile = os.path.join("constant/triSurface",geometry)
+        print(f"changing {thefile} to meter instead of mm")
+        with open(thefile,"r") as f:
+            l = f.readlines()
+        for i,line in enumerate(l):
+            if "v " in line:
+                vals_str = line.split("\n")[0].split(" ")
+                x = float(vals_str[1])/1000
+                y = float(vals_str[2])/1000
+                z = float(vals_str[3])/1000
+                vals = "v {} {} {}\n".format(x,y,z)
+                l[i] = vals
+        with open(thefile,"w") as f:
+            f.writelines(l)
+        
+    def snappyHexMesh(self,method="box",debug=False):
+        self.clear_polyMesh_for_Snappy()
+        geometry = self.conf_dict["CAD"]["object"]
+        if method == "box":
+            shutil.copy2("system/snappyHexMeshDict.box","system/snappyHexMeshDict")
+        elif method == "cad":
+            print("applying snappy with CAD object")
+            shutil.copy2("system/snappyHexMeshDict.cad","system/snappyHexMeshDict")
+        else:
+            print(f"Error in snappyHexMesh: method {method} not implemented.")
+            exit(1)
         print("preparing snappyHexMesh...")
-        os.remove("0/*.gz")
-        os.removedirs("0/uniform")
+        content = glob.glob("0/*.gz")
+        if content:
+            for i in content:
+                os.remove(i)
+        content = glob.glob("0/uniform")
+        if content:
+            os.removedirs("0/uniform")
         self.copy_0backup()
+        self.change_obj_file_to_meter()
         print("snappyHexMesh-ing...")
-        stdout,stderr = self._run_system_command("snappyHexMesh -overwrite")
+        if debug:
+            stdout,stderr = self._run_system_command("snappyHexMesh")
+        else:
+            stdout,stderr = self._run_system_command("snappyHexMesh -overwrite")
         with open("log.snappyHexMesh","w") as f:
             f.write(stdout)
             f.write(stderr)
@@ -216,7 +297,25 @@ class Case(object):
         Ry = self.R0 / e_x**(2/3)
         Rx = Ry * e_x
         expression=f"{self.sq_x} + {self.sq_y}*{e_x}*{e_x} < {Rx} * {Rx} ?0:1"
-        self.run_funkySetFields_command("alpha1",expression,"")        
+        self.run_funkySetFields_command("alpha1",expression,"")
+        
+    def set_alpha_field_Vogel(self):
+        print("--- setting alpha1 to Vogel guide tip bubble")
+        heightOfVogelBubble = self.conf_dict["bubble"]["heightOfVogelBubble"]
+        RadiusOfVogelBubble = self.conf_dict["bubble"]["radiusOfVogelBubble"]
+        sq_RadiusOfVogelBubble = RadiusOfVogelBubble**2
+        capRadiusOfVogelBubble = self.conf_dict["bubble"]["capRadiusOfVogelBubble"]
+        self.run_funkySetFields_command("alpha1",f"{self.sq_x} + {self.sq_z} < {sq_RadiusOfVogelBubble} && \
+                                                   {self.y_coord} < {self.bubble_center} + {heightOfVogelBubble} && \
+                                                   {self.y_coord} > {self.bubble_center} ? 0 : 1","")
+        
+        temp_origin = heightOfVogelBubble - np.sqrt( capRadiusOfVogelBubble**2 - RadiusOfVogelBubble**2 ) + self.bubble_center
+        t_sq_x = self.sq_x
+        t_sq_y = f"({self.y_coord}-{temp_origin})*({self.y_coord}-{temp_origin})"
+        t_sq_z = self.sq_z
+        t_radial_distance = f"sqrt({t_sq_x} + {t_sq_y} + {t_sq_z})"
+        self.run_funkySetFields_command("alpha1",f"{t_sq_x} + {t_sq_z} < {sq_RadiusOfVogelBubble} && \
+                                                   {t_radial_distance} < {capRadiusOfVogelBubble} ? 0 : 1","")
         
     def get_correct_a0_from_Rn_and_coeffs(self):
         RE  = self.Rn
@@ -319,11 +418,11 @@ class Case(object):
         Rdiscr = (Vinitdiscr / (4.*np.pi)*3)**(1./3.)
         p_initdiscr = ((self.gamma -1.)*(Einit - self.pInf*(Vinitdiscr-Vn)) + self.pn*Vn) / Vinitdiscr  
         print("adapting Rn...")
-        Rndiscr = self._Newton_find_Rn(self,p_initdiscr,Rdiscr,self.Rn)
-        pndiscr = self.pInf + 2.*self.sigma/Rndiscr - pV
+        Rndiscr = self._Newton_find_Rn(p_initdiscr,Rdiscr,self.Rn)
+        pndiscr = self.pInf + 2.*self.sigma/Rndiscr - self.pV
         print("R_0new      = {}".format(Rdiscr))
         print("R_n_new     = {}".format(Rndiscr))
-        print("pBubble_old = {}".format(pBubble))
+        print("pBubble_old = {}".format(self.pBubble))
         print("pBubble_new = {}".format(p_initdiscr))
         expression = f"{p_initdiscr}*(1.-alpha1)+{self.pVar}*alpha1"
         self.run_funkySetFields_command(self.pVar,expression,"")
@@ -361,6 +460,15 @@ class Case(object):
         print(f"---- passiveScalar part till Y: {Y} ----")
         self.run_funkySetFields_command("passiveScalar","1.0","")
         self.run_funkySetFields_command("passiveScalar",f"{self.y_coord}/{Y}",f"{self.y_coord} < {Y} ")
+        
+    def set_passiveScalar_sinus_schlieren(self,radius_of_PS,ycenter_of_PS,num_per_180_deg):
+        print("---- setting PS to sinus schlieren 3D")
+        t_sq_y = f"({self.y_coord}-{ycenter_of_PS})*({self.y_coord}-{ycenter_of_PS})"
+        r = f"sqrt({self.sq_x} + {t_sq_y} + {self.sq_z})"
+        theta = f"acos({self.z_coord}/{r})"
+        phi = f"(sign({self.y_coord})*acos({self.x_coord}/sqrt({self.sq_x} + {t_sq_y})))"
+        arg = f"2*{np.pi}*2*{num_per_180_deg}"
+        self.run_funkySetFields_command("passiveScalar",f"{r} < {radius_of_PS} ? alpha1*sin({arg}*{phi})*sin({arg}*{theta}) : 0","")
 
     def decompose(self):
         method = self.conf_dict["decompose"]["method"]
@@ -495,6 +603,79 @@ class Case(object):
         for i,j in enumerate(tree): shutil.copy2(j, tree_less[i])
         
         self.find_and_replace_variables_in_copied_templates(tree_less)
+        
+    def _sed(self,filename,string_to_replace,replace_string):
+        with open(filename,"r") as f:
+            l = f.readlines()
+        for n,k in enumerate(l):
+            l[n] = k.replace(string_to_replace,replace_string)
+        with open(filename,"w") as f:
+            f.writelines(l)
+        
+    def refineMesh3D(self):
+        print("prepare refining mesh...")
+        n0 = self.conf_dict["mesh"]["startCellAmount"]
+        csgoal = self.conf_dict["mesh"]["cellSize"]
+        xSize = self.conf_dict["mesh"]["xSize"]
+        ySize = self.conf_dict["mesh"]["ySize"]
+        zSize = self.conf_dict["mesh"]["zSize"]
+        Vc = xSize*ySize*zSize/n0
+        edge_length = Vc**(1./3.)
+        iterations = round(np.log(edge_length/csgoal)/np.log(2.))
+        print(f"number of iterations: {iterations}")
+        shutil.copy2("system/refineMeshDict.3D","system/refineMeshDict")
+        if iterations > 13:
+            print(f"Error in refineMesh prep.: impossible number of iterations: {iterations} > 13")
+            exit(1)
+        refineUntil = self.conf_dict["refine"]["refineUntil"]
+        refineFrom = self.conf_dict["refine"]["refineFrom"]
+        
+        j=1
+        while j < iterations + 1:
+            print(f"cp system cellSetDict.1.backup system/cellSetDict.{j}")
+            shutil.copy2("system/cellSetDict.1.backup",f"system/cellSetDict.{j}")
+            cellSetCenter = self.bubble_center
+            self._sed(f"system/cellSetDict.{j}","dinit","{}".format(cellSetCenter))
+            refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
+            ec_curr = edge_length/2**j 
+            print(f"refine radius: {refDist}, edge_length approx: {ec_curr}")
+            self._sed(f"system/cellSetDict.{j}","rrradius","{}".format(refDist))
+            j = j + 1
+        j=1
+        while j < iterations + 1:
+            print(f"cellSetting {j}...")
+            shutil.copy2(f"system/cellSetDict.{j}","system/cellSetDict")
+            stdout,stderr = self._run_system_command("cellSet")
+            with open(f"log.cellSet.{j}","w") as f:
+                f.write(stdout)
+                f.write(stderr)
+            print("refining mesh...")
+            stdout,stderr = self._run_system_command("refineMesh -dict")
+            with open(f"log.refineMesh.{j}","w") as f:
+                f.write(stdout)
+                f.write(stderr)
+            latestRefineFolder = self.find_biggestNumber(proc_path=".")
+            content = glob.glob(f"{latestRefineFolder}/polyMesh/*")
+            for i in content:
+                stdout,stderr = self._run_system_command(f"cp -r {i} constant/polyMesh/")
+            print(f"rm -rf {latestRefineFolder}")
+            self._run_system_command(f"rm -rf {latestRefineFolder}")
+            j = j + 1
+            
+        
+    def _path_is_num(self,path):
+        try:
+            float(path)
+        except ValueError: 
+            return False
+        else:
+            return True
+        return False
+
+    def find_biggestNumber(self,proc_path="processor0"):
+        time_files = [os.path.join(proc_path, i) for i in os.listdir(proc_path) if self._path_is_num(i)]  
+        time_steps = np.array([float(i.split('/')[-1]) for i in time_files])
+        return(np.max(time_steps))
     
     
     
@@ -567,7 +748,6 @@ class Mesh(Case):
         // * * * * * * * * Max Koch Mesh made with Python  * * * * * * * * * * * * * //
         """
         self.sketch = ""
-        self.origin = self.conf_dict["bubble"]["ycenter"]
         self.vertices = {}
         self.blocks = {}
         self.edges = {}
