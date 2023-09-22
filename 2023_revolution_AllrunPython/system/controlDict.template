@@ -1,0 +1,200 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+libs (
+      "libfoam.so"
+      "libsimpleSwakFunctionObjects.so"
+      "libswakFunctionObjects.so"
+      "libwaveTransmissive_timeVaryingPatm.so"
+      "libgroovyBC.so"
+//       "libVOFInterpolationSchemes.so"
+     );
+
+application     _SOLVERCONTROLS-SOLVER;
+
+startFrom    startTime;
+
+startTime       _CONTROLDICT-STARTTIME;
+
+stopAt          endTime;
+
+endTime         _CONTROLDICT-ENDTIME;
+
+deltaT          _CONTROLDICT-DELTAT;
+
+writeControl    _CONTROLDICT-WRITECONTROL;
+//writeControl    timeStep; adjustableRunTime
+
+// the uncommented line of the below three MUST stand on top!!!!!
+writeInterval   _CONTROLDICT-WRITEINTERVAL;// every 10th timestep //
+// writeInterval   1e-06; 
+// for adjustableRunTime: every bla [s] 
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression compressed;
+
+timeFormat      general;
+
+timePrecision   10;
+
+runTimeModifiable yes;
+
+adjustTimeStep  _CONTROLDICT-ADJUSTTIMESTEP;
+
+courantInAlpha1Only _CONTROLDICT-COURANTINALPHA1ONLY;
+maxCo           _CONTROLDICT-MAXCO;
+discardMaxCoBubble false;
+maxAlphaCo      _CONTROLDICT-MAXALPHACO;
+maxAcousticCo   _CONTROLDICT-MAXACOUSTICCO;
+machNoSwitchToAcousticCo   _CONTROLDICT-MACHSWITCH;
+critAcousticCo  _CONTROLDICT-RADIUSRATIOSWITCHTOACOUSTICCO;
+stayBelowAcousticCo  _CONTROLDICT-STAYBELOWACOUSTICCO;
+
+maxDeltaT       _CONTROLDICT-MAXDELTAT;
+maxU        _CONTROLDICT-MAXU;
+
+printInfos    _CONTROLDICT-PRINTINFOS;
+
+
+functions
+{
+    probes
+    {
+        type            probes;
+        functionObjectLibs ("libsampling.so");
+        outputControl   timeStep;
+        outputInterval  1;
+        probeLocations
+        (
+            ( _OTHERCONTROLS-DXMINHALF 0 0 )
+            ( 0.003 0.0 0 )
+            ( 0.003 0.003 0 )
+        );
+        fields
+        (
+            p_rgh
+            U
+        );
+    }
+
+//    volumeMinMax
+//    {
+//       type volumeMinMax;
+//      functionObjectLibs
+//        (
+//          "libsimpleFunctionObjects.so"
+//        );
+//      verbose true;
+//      outputControlMode   timeStep;
+//      outputInterval  1;
+//      fields
+//        (
+//          Mach
+//        );
+//    }
+
+//   extremeP {
+//    type  swakExpression;
+//    valueType  set;
+//    verbose  true;
+//    outputControlMode timeStep;
+//    outputInterval  1;
+//    setName  lineY1;
+//    set {
+//      type  midPoint;
+//      axis y ;
+//      start (_OTHERCONTROLS-DXMINHALF _OTHERCONTROLS-DXMINHALF 0) ;   // -distReplace: y-Koordinate der Wand
+//      end ( 0.003   _OTHERCONTROLS-DXMINHALF    0) ;  //
+//    }
+//    interpolate  false;
+//    interpolationType  cell;
+//    expression  "p_rgh";
+//    accumulations (min max);
+//    }
+//
+//    maxPPosition {
+//      $extremeP;
+//      expression "maxPosition(p_rgh)";
+//      accumulations (average);
+//    }
+//
+//    minPPosition {
+//      $extremeP;
+//      expression "minPosition(p_rgh)";
+//      accumulations (average);
+//    }
+//
+//  extremeUy {
+//    type  swakExpression;
+//    valueType  set;
+//    verbose  true;
+//    outputControlMode timeStep;
+//    outputInterval  1;
+//    setName  lineY1;
+//    set {
+//      type  midPoint;
+//      axis y ;
+//      start (_OTHERCONTROLS-DXMINHALF _OTHERCONTROLS-DXMINHALF 0) ;   // -distReplace: y-Koordinate der Wand
+//      end   (_OTHERCONTROLS-DXMINHALF  _BUBBLE-RMAX   0) ;  //
+//    }
+//    variables (
+//                "ydirection=vector(0,1,0);"
+//                "Uy=alpha1*(U & ydirection);"
+//       );
+//      expression "Uy";
+//      accumulations (min max);
+//    }
+//
+//    maxUyPosition {
+//      $extremeUy;
+//      expression "maxPosition(Uy)";
+//      accumulations (average);
+//    }
+//    minUyPosition {
+//      $extremeUy;
+//      expression "minPosition(Uy)";
+//      accumulations (average);
+//    }
+    
+   volumeIntegral
+   {
+      type volumeIntegrate;
+     functionObjectLibs
+       (
+         "libsimpleFunctionObjects.so"
+       );
+     verbose true;
+     outputControlMode   timeStep;
+     outputInterval  1;
+     fields
+       (
+            //rho
+            rhoBubble
+            alpha2
+            //p_rgh
+       );
+   }
+
+}
+
+
+// ************************************************************************* //

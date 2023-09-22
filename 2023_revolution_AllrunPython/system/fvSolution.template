@@ -1,0 +1,130 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+solvers
+{
+    "(U|rho_gTilde|rho2Tilde|rho_l|alpha2|passiveScalar)"
+    {
+        solver           PBiCG;
+       //solver          PCG;
+       //  preconditioner
+       //  {
+       //      preconditioner  GAMG;
+       //      tolerance       0.001;
+       //      relTol          0;
+       //      smoother        GaussSeidel;
+       //      nPreSweeps      0;
+       //      nPostSweeps     2;
+       //      nBottomSweeps   2;
+       //      cacheAgglomeration false;
+       //      nCellsInCoarsestLevel 10;
+       //      agglomerator    faceAreaPair;
+       //      mergeLevels     1;
+       //  }
+        preconditioner   DILU;
+        tolerance        1e-14;
+        relTol           0;
+    }
+    
+    "(U|rho_gTilde|rho2Tilde|rho_l|alpha2|passiveScalar)Final"
+    {
+        solver           PBiCG;
+        preconditioner   DILU;
+        tolerance        1e-14;
+        relTol           0;
+    }
+    
+    "(rhoFinal)"
+    {
+        solver           bla;
+        preconditioner   DILU;
+        tolerance        1e-20;
+        relTol           0;
+    }
+    
+    "(rho)"
+    {
+        $rhoFinal
+    }
+
+    p_rghFinal
+    {
+        solver           BiCGStab; //PCG;
+        preconditioner   DILU;
+         //solver           PCG; // for symmetric, non-transonic matrices // PBiCG;// for asymmetrical transonic matrices //GMRES; //BiCGStab (seems to be prone to not converge);
+         //preconditioner   DIC; // for symmetric, non-transonic matrices //DILU; //for asymmetrical transonic matrices  //DIC
+//         solver           BiCGStab;
+//         nDirections      5;
+        tolerance        1e-14;
+//         maxIter          400;
+//         tolerance        1e-20;
+        relTol           0;
+    };
+
+    p_rgh
+    {
+        $p_rghFinal;
+    };
+    
+    sump_rgh
+    {
+        $p_rghFinal;
+    }
+    
+    sump_rghFinal
+    {
+        $p_rghFinal;
+    }
+}
+
+mysolver
+{
+    transonic                  _SOLVERCONTROLS-TRANSONIC;
+    nOuterCorrectors           _SOLVERCONTROLS-NOUTERCORRECTORS; //1;
+    nCorrectors                _SOLVERCONTROLS-NCORRECTORS; //2;
+    nNonOrthogonalCorrectors   _SOLVERCONTROLS-NNONORTHOGONALCORRECTORS; //2;
+
+    cAlpha                     _SOLVERCONTROLS-CALPHA; //1;
+    nAlphaCorr                 _SOLVERCONTROLS-NALPHACORR; //2;
+    nAlphaSubCycles            _SOLVERCONTROLS-NALPHASUBCYCLES; //5;
+    
+    alpha2TildeMin             _SOLVERCONTROLS-ALPHA2TILDEMIN; //1e-6;
+    
+    usePsiAlteration           _SOLVERCONTROLS-PSIALTERATION;
+    applyDgdtCut               _SOLVERCONTROLS-APPLYDGDTCUT;
+    corrMass                   _SOLVERCONTROLS-MASSCORR;
+    gmc_inside_PISO            _SOLVERCONTROLS-GMCINPISO;
+    calcEOSderivatives_PISO    _SOLVERCONTROLS-CALCEOSDERIVINPEQN;
+    momPredictor               _SOLVERCONTROLS-PREDICTOR;
+    removeUz                   _SOLVERCONTROLS-REMOVEUZ;
+    removeUy                   _SOLVERCONTROLS-REMOVEUY;
+    dgdtCutLiq                 _SOLVERCONTROLS-DGDTCUTLIQ;
+    dgdtCutGas                 _SOLVERCONTROLS-DGDTCUTGAS;
+    
+    restrictU               _OTHERCONTROLS-RESTRICTU;
+    limitAlpha              _OTHERCONTROLS-LIMITALPHA;
+}
+
+
+PISO
+{
+    $mysolver
+}
+
+
+// ************************************************************************* //

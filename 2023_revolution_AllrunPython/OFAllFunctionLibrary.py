@@ -83,7 +83,15 @@ class Case(object):
         print("Rn      = {} ".format(self.Rn))
         print("pn      = {} ".format(self.pn))
         print("pBubble = {} ".format(self.pBubble))
-    
+        
+        self.copied_snappyHexMeshDict_already = False
+        try:
+            snappyScript = self.conf_dict["snappy"]["snappyScript"]
+            if snappyScript == "snappyHexMeshDict":
+                self.copied_snappyHexMeshDict_already = True
+        except(KeyError):
+            self.copied_snappyHexMeshDict_already = True
+            
     def Allclean(self):
         #stdout,stderr = self._run_system_command("bash Allclean")
         #print(stdout,stderr)
@@ -155,9 +163,11 @@ class Case(object):
         if os.path.isdir("CAD"):
             try:
                 self._mkdir_if_not_exists("constant/triSurface")
-                shutil.copy2("CAD/{}".format(self.conf_dict["CAD"]["object"]),"constant/triSurface/")
+                for obj in self.conf_dict["CAD"]["objects"]:
+                    shutil.copy2("CAD/{}".format(obj),"constant/triSurface/")
+                    self.change_obj_file_to_meter(obj)
             except:
-                print("WARNING: couldn't copy CAD/{}".format(self.conf_dict["CAD"]["object"]))
+                print("WARNING: couldn't copy CAD/{}".format(self.conf_dict["CAD"]["objects"]))
     
     def clear_polyMesh_for_Snappy(self):
         content = glob.glob("constant/polyMesh/sets")
@@ -215,8 +225,8 @@ class Case(object):
         self.nCellsCM = self._grep("log.checkMesh","cells:")[0].replace("cells:","")
         print("cells now: ",self.nCellsCM)
         
-    def change_obj_file_to_meter(self):
-        geometry = self.conf_dict["CAD"]["object"]
+    def change_obj_file_to_meter(self,geometry):
+        geometry = geometry
         thefile = os.path.join("constant/triSurface",geometry)
         print(f"changing {thefile} to meter instead of mm")
         with open(thefile,"r") as f:
@@ -232,17 +242,11 @@ class Case(object):
         with open(thefile,"w") as f:
             f.writelines(l)
         
-    def snappyHexMesh(self,method="box",debug=False):
+    def snappyHexMesh(self,debug=False):
         self.clear_polyMesh_for_Snappy()
-        geometry = self.conf_dict["CAD"]["object"]
-        if method == "box":
-            shutil.copy2("system/snappyHexMeshDict.box","system/snappyHexMeshDict")
-        elif method == "cad":
-            print("applying snappy with CAD object")
-            shutil.copy2("system/snappyHexMeshDict.cad","system/snappyHexMeshDict")
-        else:
-            print(f"Error in snappyHexMesh: method {method} not implemented.")
-            exit(1)
+        if not self.copied_snappyHexMeshDict_already:
+            shutil.copy2("system/{}".format(self.conf_dict["snappy"]["snappyScript"]),"system/snappyHexMeshDict")
+            self.copied_snappyHexMeshDict_already = True
         print("preparing snappyHexMesh...")
         content = glob.glob("0/*.gz")
         if content:
@@ -252,7 +256,6 @@ class Case(object):
         if content:
             os.removedirs("0/uniform")
         self.copy_0backup()
-        self.change_obj_file_to_meter()
         print("snappyHexMesh-ing...")
         if debug:
             stdout,stderr = self._run_system_command("snappyHexMesh")
@@ -611,7 +614,107 @@ class Case(object):
             l[n] = k.replace(string_to_replace,replace_string)
         with open(filename,"w") as f:
             f.writelines(l)
+            
+    def prepare_snappyHexMeshDict_CAD_and_bubble(self):
+        print("--- prepare snappyHexMeshDict for CAD object and bubble region refinement...")
+        script = "system/{}".format(self.conf_dict["snappy"]["snappyScript"])
+        print(f".. using {script} as basis ..")
+        shutil.copy2(script,"system/snappyHexMeshDict")
+        self.copied_snappyHexMeshDict_already = True
         
+        ### --- objects part
+        objects_str = ""
+        surfaces_refinement_str = ""
+        for i,obj in enumerate(self.conf_dict["CAD"]["objects"]):
+            obj_str = "{}\n\
+            {{\n\
+                type triSurfaceMesh;\n\
+                regions\n\
+                {{\n\
+                    patch0\n\
+                    {{\n\
+                        name box1x1x1_region0;\n\
+                    }}\n\
+                }}\n\
+            }}\n".format(obj)
+            objects_str = "{}{}".format(objects_str,obj_str)
+            
+            surface_ref_str = "{}\n\
+            {{\n\
+                // Surface-wise min and max refinement level\n\
+                level {};\n\
+            }}\n".format(obj,self.conf_dict["snappy"]["refineObjectsLevels"][i])
+            surfaces_refinement_str = "{}{}".format(surfaces_refinement_str,surface_ref_str)
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-OBJECTS",objects_str)
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINESURFACES",surfaces_refinement_str)
+        
+        ### --- bubble part 
+        n0 = self.conf_dict["mesh"]["startCellAmount"]
+        csgoal = self.conf_dict["mesh"]["cellSize"]
+        xSize = self.conf_dict["mesh"]["xSize"]
+        ySize = self.conf_dict["mesh"]["ySize"]
+        zSize = self.conf_dict["mesh"]["zSize"]
+        Vc = xSize*ySize*zSize/n0
+        edge_length = Vc**(1./3.)
+        iterations = round(np.log(edge_length/csgoal)/np.log(2.))
+        print(f"number of iterations: {iterations}")
+        
+        if iterations > 13:
+            print(f"Error in refineMesh prep.: impossible number of iterations: {iterations} > 13")
+            exit(1)
+        refineUntil = self.conf_dict["refine"]["refineUntil"]
+        refineFrom = self.conf_dict["refine"]["refineFrom"]
+            
+        
+        j=1
+        spheres_geometry_str = ""
+        regions_refine_str = ""
+        while j < iterations + 1:
+            print("--- preparing snappyHexMeshDict for refinement instead of refineMesh")
+            cellSetCenter = self.bubble_center
+            refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
+            ec_curr = edge_length/2**j 
+            print(f"refine (snappy) radius: {refDist}, edge_length approx: {ec_curr}")
+            sphere_str = "sphere{}\n\
+            {{\n\
+                type searchableSphere;\n\
+                centre  (0 {} 0);\n\
+                radius  {};\n\
+            }}\n".format(j,cellSetCenter,refDist)
+            region_str = "sphere{}\n\
+            {{\n\
+                mode inside;\n\
+                levels ((1E15 {}));\n\
+            }}\n".format(j,j)
+            
+            spheres_geometry_str = "{}{}".format(spheres_geometry_str,sphere_str)
+            regions_refine_str = "{}{}".format(regions_refine_str,region_str)
+            j = j + 1
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINESNAPPYSPHERES",spheres_geometry_str)
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINEMENTREGIONS",regions_refine_str)
+        
+        ### -- extra objects part:
+        extraObjGeos_str = ""
+        extraObjRefs_str = ""
+        if self.conf_dict["snappy"]["addExtraObjects"]:
+            for extra_obj in self.conf_dict["snappy"]["extraObjects"]:
+                eOg_str = "{}\n{{\n".format(extra_obj)
+                for prop in self.conf_dict["snappy"]["extraObjects"][f"{extra_obj}"]:
+                    #print(f"self.conf_dict[\"snappy\"][\"extraObjects\"][{extra_obj}][{prop}] =")
+                    val = self.conf_dict["snappy"]["extraObjects"][f"{extra_obj}"][f"{prop}"]
+                    #print(val)
+                    if not prop == "level":
+                        eOg_str = "{}{}   {};\n".format(eOg_str,prop,val)
+                eOg_str = "{}\n}}\n".format(eOg_str)
+                extraObjGeos_str = "{}{}".format(extraObjGeos_str,eOg_str)
+                ref_str = "{}\n\
+                {{\n\
+                    level {};\n\
+                }}\n".format(extra_obj,self.conf_dict["snappy"]["extraObjects"][extra_obj]["level"])
+                extraObjRefs_str = "{}{}".format(extraObjRefs_str,ref_str)
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-EXTRAOBJECTSGEOMETRY",extraObjGeos_str)
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-EXTRAOBJECTSREFINE",extraObjRefs_str)
+            
     def refineMesh3D(self):
         print("prepare refining mesh...")
         n0 = self.conf_dict["mesh"]["startCellAmount"]
@@ -629,7 +732,7 @@ class Case(object):
             exit(1)
         refineUntil = self.conf_dict["refine"]["refineUntil"]
         refineFrom = self.conf_dict["refine"]["refineFrom"]
-        
+            
         j=1
         while j < iterations + 1:
             print(f"cp system cellSetDict.1.backup system/cellSetDict.{j}")
