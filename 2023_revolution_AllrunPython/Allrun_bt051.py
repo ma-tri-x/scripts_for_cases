@@ -32,7 +32,7 @@ def main():
     mesh.write_blockMeshDict()
     
     case.blockMesh()
-    case.prepare_snappyHexMeshDict_CAD_and_bubble()
+    case.prepare_snappyHexMeshDict_CAD_and_bubble(refinementCenter=ycenter_of_PS)
     case.snappyHexMesh()
     
     case.set_U_field_zero()

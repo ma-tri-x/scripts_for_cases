@@ -615,12 +615,15 @@ class Case(object):
         with open(filename,"w") as f:
             f.writelines(l)
             
-    def prepare_snappyHexMeshDict_CAD_and_bubble(self):
+    def prepare_snappyHexMeshDict_CAD_and_bubble(self,*args, **kwargs):
         print("--- prepare snappyHexMeshDict for CAD object and bubble region refinement...")
         script = "system/{}".format(self.conf_dict["snappy"]["snappyScript"])
         print(f".. using {script} as basis ..")
         shutil.copy2(script,"system/snappyHexMeshDict")
         self.copied_snappyHexMeshDict_already = True
+        refinementCenter = kwargs.get('refinementCenter',None)
+        if not refinementCenter:
+            refinementCenter = self.bubble_center
         
         ### --- objects part
         objects_str = ""
@@ -671,7 +674,7 @@ class Case(object):
         regions_refine_str = ""
         while j < iterations + 1:
             print("--- preparing snappyHexMeshDict for refinement instead of refineMesh")
-            cellSetCenter = self.bubble_center
+            cellSetCenter = refinementCenter #self.bubble_center
             refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
             ec_curr = edge_length/2**j 
             print(f"refine (snappy) radius: {refDist}, edge_length approx: {ec_curr}")
