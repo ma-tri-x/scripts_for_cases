@@ -717,6 +717,31 @@ class Case(object):
                 extraObjRefs_str = "{}{}".format(extraObjRefs_str,ref_str)
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-EXTRAOBJECTSGEOMETRY",extraObjGeos_str)
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-EXTRAOBJECTSREFINE",extraObjRefs_str)
+        
+        ### -- extra regions part:
+        extraRegAllGeos_str = ""
+        extraRegAllRefs_str = ""
+        if self.conf_dict["snappy"]["addExtraRegions"]:
+            for extra_reg in self.conf_dict["snappy"]["extraRegions"]:
+                eRg_str = "{}\n{{\n".format(extra_reg)
+                for prop in self.conf_dict["snappy"]["extraRegions"][f"{extra_reg}"]:
+                    #print(f"self.conf_dict[\"snappy\"][\"extraObjects\"][{extra_obj}][{prop}] =")
+                    val = self.conf_dict["snappy"]["extraRegions"][f"{extra_reg}"][f"{prop}"]
+                    #print(val)
+                    if not prop == "level":
+                        eRg_str = "{}{}   {};\n".format(eRg_str,prop,val)
+                eRg_str = "{}\n}}\n".format(eRg_str)
+                extraRegAllGeos_str = "{}{}".format(extraRegAllGeos_str,eRg_str)
+                ref_str = "{}\n\
+                {{\n\
+                    mode {};\n\
+                    levels {};\n\
+                }}\n".format(extra_reg,
+                             self.conf_dict["snappy"]["extraRegions"][extra_reg]["mode"],
+                             self.conf_dict["snappy"]["extraRegions"][extra_reg]["levels"])
+                extraRegAllRefs_str = "{}{}".format(extraRegAllRefs_str,ref_str)
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-EXTRAREGIONSGEOMETRY",extraRegAllGeos_str)
+        self._sed("system/snappyHexMeshDict","_ALLRUNPY-EXTRAREGIONSREFINE",extraRegAllRefs_str)
             
     def refineMesh3D(self):
         print("prepare refining mesh...")
