@@ -31,7 +31,11 @@ class Case(object):
         self.conf_dict = conf_dict_loaded_as_dict
         
         self.store_solver_commit_number()
-        self.meshFile = "constant/polyMesh/{}".format(self.conf_dict["mesh"]["meshFile"])
+        try:
+            self.meshFile = "constant/polyMesh/{}".format(self.conf_dict["mesh"]["meshFile"])
+        except(KeyError):
+            print("Warning: no meshFile given for m4... but probably taking python mesh?")
+            self.meshFile = "constant/polyMesh/dontUseThisOne"
         self.copy_0backup()
         self.bubble_center = self.determine_bubble_center()
         
@@ -55,7 +59,7 @@ class Case(object):
         self.pn = self.pInf + 2.* self.sigma / self.Rn - self.pV  
         self.Rmax = self.conf_dict["bubble"]["Rmax"]
         self.R0 = self.conf_dict["bubble"]["Rstart"]
-        self.width = self.conf_dict["funkySetFields"]["widthOfInterface"]
+        self.widthOfInterface = self.conf_dict["funkySetFields"]["widthOfInterface"]
         self.Uif = self.conf_dict["funkySetFields"]["U_interface"]
 
         self.rho_n = self.pn / (self.specGasConst * self.Tref * (1.- self.beta) )
@@ -180,11 +184,12 @@ class Case(object):
         if content:
             os.remove(content[0])
         
-    def determine_bubble_center(self):
-        offset = 0.0
+    def determine_bubble_center(self,secondBubble=False):
+        offset = self.conf_dict["bubble"]["D_init"]
         try:
             if self.conf_dict["bubble"]["doubleBubble"]:
-                offset = - self.conf_dict["bubble"]["D_init"]
+                if secondBubble:
+                    offset = - self.conf_dict["bubble"]["D_init"]
         except(KeyError):
             try:
                 if self.conf_dict["bubble"]["ycenter"]:
@@ -290,8 +295,8 @@ class Case(object):
         self.run_funkySetFields_command("U","0.0 * vector(0,1,0)","")
     
     def set_alpha_field_bubble(self):
-        print(f"---- setting alpha1 field for a bubble with R0 = {self.R0} at D_init = {self.D_init} ----")
-        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{self.R0})*5.9/{self.widthOfInterface})+1)","",0.0)
+        print(f"---- setting alpha1 field for a bubble with R0 = {self.R0} at D_init = {self.bubble_center} ----")
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{self.R0})*5.9/{self.widthOfInterface})+1)","")
         
     def set_alpha_field_ellipse(self):
         print("----- setting alpha1 field ellipse ------")
@@ -652,47 +657,49 @@ class Case(object):
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINESURFACES",surfaces_refinement_str)
         
         ### --- bubble part 
-        n0 = self.conf_dict["mesh"]["startCellAmount"]
-        csgoal = self.conf_dict["mesh"]["cellSize"]
-        xSize = self.conf_dict["mesh"]["xSize"]
-        ySize = self.conf_dict["mesh"]["ySize"]
-        zSize = self.conf_dict["mesh"]["zSize"]
-        Vc = xSize*ySize*zSize/n0
-        edge_length = Vc**(1./3.)
-        iterations = round(np.log(edge_length/csgoal)/np.log(2.))
-        print(f"number of iterations: {iterations}")
-        
-        if iterations > 13:
-            print(f"Error in refineMesh prep.: impossible number of iterations: {iterations} > 13")
-            exit(1)
-        refineUntil = self.conf_dict["refine"]["refineUntil"]
-        refineFrom = self.conf_dict["refine"]["refineFrom"]
-            
-        
-        j=1
+        refineBubblePart = kwargs.get('refineBubblePart',None)
         spheres_geometry_str = ""
         regions_refine_str = ""
-        while j < iterations + 1:
-            print("--- preparing snappyHexMeshDict for refinement instead of refineMesh")
-            cellSetCenter = refinementCenter #self.bubble_center
-            refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
-            ec_curr = edge_length/2**j 
-            print(f"refine (snappy) radius: {refDist}, edge_length approx: {ec_curr}")
-            sphere_str = "sphere{}\n\
-            {{\n\
-                type searchableSphere;\n\
-                centre  (0 {} 0);\n\
-                radius  {};\n\
-            }}\n".format(j,cellSetCenter,refDist)
-            region_str = "sphere{}\n\
-            {{\n\
-                mode inside;\n\
-                levels ((1E15 {}));\n\
-            }}\n".format(j,j)
+        if not refineBubblePart == False:
+            n0 = self.conf_dict["mesh"]["startCellAmount"]
+            csgoal = self.conf_dict["mesh"]["cellSize"]
+            xSize = self.conf_dict["mesh"]["xSize"]
+            ySize = self.conf_dict["mesh"]["ySize"]
+            zSize = self.conf_dict["mesh"]["zSize"]
+            Vc = xSize*ySize*zSize/n0
+            edge_length = Vc**(1./3.)
+            iterations = round(np.log(edge_length/csgoal)/np.log(2.))
+            print(f"number of iterations: {iterations}")
             
-            spheres_geometry_str = "{}{}".format(spheres_geometry_str,sphere_str)
-            regions_refine_str = "{}{}".format(regions_refine_str,region_str)
-            j = j + 1
+            if iterations > 13:
+                print(f"Error in refineMesh prep.: impossible number of iterations: {iterations} > 13")
+                exit(1)
+            refineUntil = self.conf_dict["refine"]["refineUntil"]
+            refineFrom = self.conf_dict["refine"]["refineFrom"]
+                
+            
+            j=1
+            while j < iterations + 1:
+                print("--- preparing snappyHexMeshDict for refinement instead of refineMesh")
+                cellSetCenter = refinementCenter #self.bubble_center
+                refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
+                ec_curr = edge_length/2**j 
+                print(f"refine (snappy) radius: {refDist}, edge_length approx: {ec_curr}")
+                sphere_str = "sphere{}\n\
+                {{\n\
+                    type searchableSphere;\n\
+                    centre  (0 {} 0);\n\
+                    radius  {};\n\
+                }}\n".format(j,cellSetCenter,refDist)
+                region_str = "sphere{}\n\
+                {{\n\
+                    mode inside;\n\
+                    levels ((1E15 {}));\n\
+                }}\n".format(j,j)
+                
+                spheres_geometry_str = "{}{}".format(spheres_geometry_str,sphere_str)
+                regions_refine_str = "{}{}".format(regions_refine_str,region_str)
+                j = j + 1
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINESNAPPYSPHERES",spheres_geometry_str)
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINEMENTREGIONS",regions_refine_str)
         
