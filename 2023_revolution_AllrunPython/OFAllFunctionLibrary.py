@@ -40,7 +40,7 @@ class Case(object):
         self.bubble_center = self.determine_bubble_center()
         
         self.gamma = self.conf_dict["gas"]["gamma"]
-        self.pV = self.conf_dict["transportProperties"]["pV"]
+        self.pV = self.conf_dict["gas"]["pV"]
         self.pInf = self.conf_dict["liquid"]["pInf"]
         self.Rn = self.conf_dict["bubble"]["Rn"] * (101315./self.pInf)**(1./3.)
         try:
@@ -54,7 +54,7 @@ class Case(object):
         self.Tref = self.conf_dict["transportProperties"]["Tref"]
         self.gasConstGeneral = self.conf_dict["transportProperties"]["gasConstGeneral"] # J/mol K
         self.specGasConst = self.conf_dict["gas"]["specGasConst"]
-        self.beta = self.conf_dict["gas"]["beta"]
+        self.beta = 0.0 #self.conf_dict["gas"]["beta"]
 
         self.pn = self.pInf + 2.* self.sigma / self.Rn - self.pV  
         self.Rmax = self.conf_dict["bubble"]["Rmax"]
@@ -64,7 +64,7 @@ class Case(object):
 
         self.rho_n = self.pn / (self.specGasConst * self.Tref * (1.- self.beta) )
         self.rho_min = self.rho_n * (self.Rn / self.Rmax)**3. 
-        self.pBubble = self.pn * ((self.Rn**3. - self.beta*self.Rn**3.)/(self.R0**3. - self.beta*self.Rn**3.))**self.gamma 
+        self.pBubble = self.pn * ((self.Rn**3. - self.beta*self.Rn**3.)/(self.R0**3. - self.beta*self.Rn**3.))**self.gamma + self.pV 
 
         self.x_coord = "pos().x"
         self.y_coord = "pos().y"
@@ -260,7 +260,7 @@ class Case(object):
         content = glob.glob("0/uniform")
         if content:
             os.removedirs("0/uniform")
-        self.copy_0backup()
+        #self.copy_0backup()
         print("snappyHexMesh-ing...")
         if debug:
             stdout,stderr = self._run_system_command("snappyHexMesh")
@@ -388,7 +388,8 @@ class Case(object):
         return float(theta_str)
     
     def _func(self,p0,Rdiscr,Rn_old):
-        return self.pInf*Rn_old**(3*self.gamma) + 2*self.sigma*Rn_old**(3*self.gamma-1.) - p0*Rdiscr**(3*self.gamma)
+        #return self.pInf*Rn_old**(3*self.gamma) + 2*self.sigma*Rn_old**(3*self.gamma-1.) - p0*Rdiscr**(3*self.gamma)
+        return (self.pInf + 2.*self.sigma/Rn_old -self.pV)*(Rn_old/Rdiscr)**(3*self.gamma) + self.pV - p0
 
     def _Newton_find_Rn(self,p0,Rdiscr,Rn_old):
         if not self.sigma == 0.0:
@@ -407,31 +408,41 @@ class Case(object):
     
     def adapt_energy(self):
         print("---- setting pressure with same energy for discretization ----")
-        p_init = self.pBubble
+        p_init = self.pBubble # pBubble includes pV, pn doesn't
         Vn    = 4.*np.pi/3.* self.Rn**3  
         Vinit = 4.*np.pi/3.* self.R0**3 
-        Einit = (p_init * Vinit - self.pn * Vn)/(self.gamma -1.) + self.pInf*(Vinit - Vn)
+        #Einit = (p_init * Vinit - (self.pn + self.pV) * Vn)/(self.gamma -1.) + self.pInf*(Vinit - Vn)
+        Einit = (p_init * Vinit - (self.pn + self.pV) * Vn)/(self.gamma -1.) + self.pInf*(Vinit - Vn)
         
         true_alpha2_vol = self.get_alpha2_vol_t0()
         Vinitdiscr = true_alpha2_vol
         
         if self.conf_dict["mesh"]["meshDims"] == "2D":
+            print("... adapt_energy: calculating 2D volume")
             theta = self.read_theta()
             Vinitdiscr = true_alpha2_vol * 180. / theta
         elif self.conf_dict["mesh"]["meshDims"] == "1D":
+            print("... adapt_energy: calculating 1D volume")
             theta = self.read_theta()
             theta_rad = theta * np.pi /180.
             Vinitdiscr = true_alpha2_vol * np.pi / (np.tan(theta_rad))**2  
         
         Rdiscr = (Vinitdiscr / (4.*np.pi)*3)**(1./3.)
-        p_initdiscr = ((self.gamma -1.)*(Einit - self.pInf*(Vinitdiscr-Vn)) + self.pn*Vn) / Vinitdiscr  
-        print("adapting Rn...")
+        print("... adapt_energy: R0_input = {}".format(self.R0))
+        print("... adapt_energy: Rdiscr   = {}".format(Rdiscr))
+        #p_initdiscr = ((self.gamma -1.)*(Einit - self.pInf*(Vinitdiscr-Vn)) + self.pn * Vn) / Vinitdiscr  
+        p_initdiscr = ((self.gamma -1.)*(Einit - self.pInf*(Vinitdiscr-Vn)) + (self.pn + self.pV) * Vn) / Vinitdiscr
+        print("... adapt_energy: adapting Rn...")
         Rndiscr = self._Newton_find_Rn(p_initdiscr,Rdiscr,self.Rn)
         pndiscr = self.pInf + 2.*self.sigma/Rndiscr - self.pV
         print("R_0new      = {}".format(Rdiscr))
         print("R_n_new     = {}".format(Rndiscr))
         print("pBubble_old = {}".format(self.pBubble))
         print("pBubble_new = {}".format(p_initdiscr))
+        print(" --- consistency test: ---")
+        print("p_initdiscr={}".format(p_initdiscr))
+        print("p_directnew={}".format((self.pInf + 2.*self.sigma/Rndiscr -self.pV)*(Rndiscr/Rdiscr)**(3.*self.gamma)+self.pV))
+        print("with pInf={}, R_n_new={}, sigma={}, pV={}, R_0new={}".format(self.pInf,Rndiscr,self.sigma,self.pV,Rdiscr))
         expression = f"{p_initdiscr}*(1.-alpha1)+{self.pVar}*alpha1"
         self.run_funkySetFields_command(self.pVar,expression,"")
         self.pBubble = p_initdiscr
