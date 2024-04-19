@@ -43,8 +43,9 @@ def rescale_data_range(view):
  
         #lut.RGBPoints.SetData(newrgbpoints)
     #print(lut.RGBPoints.GetData())
-    print(view.Representations)
-    for i in view.Representations[5:-1]:
+    #print(view.Representations)
+    #for i in view.Representations[5:-1]:
+    for i in view.Representations:
         try:
             i.RescaleTransferFunctionToDataRange()
         except(AttributeError):
