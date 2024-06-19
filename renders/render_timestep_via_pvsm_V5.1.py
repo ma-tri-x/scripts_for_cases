@@ -43,7 +43,9 @@ def rescale_data_range(view):
  
         #lut.RGBPoints.SetData(newrgbpoints)
     #print(lut.RGBPoints.GetData())
-    for i in view.Representations[5:-1]:
+    #print(view.Representations)
+    #for i in view.Representations[5:-1]:
+    for i in view.Representations:
         try:
             i.RescaleTransferFunctionToDataRange()
         except(AttributeError):
@@ -187,8 +189,8 @@ def render_timestep():
                 reader.UpdatePipeline()
                 rescale_data_range(view)
                 #save screenshot
-                pv.WriteImage("{}{}.png".format(args.outfiles,str(t_idx).zfill(4)))
-                os.system("convert -trim {}{}.png {}{}.png".format(args.outfiles,str(t_idx).zfill(4),args.outfiles,str(t_idx).zfill(4)))
+                pv.WriteImage("{}.{}.png".format(args.outfiles,str(t_idx).zfill(4)))
+                #os.system("convert -trim {}{}.png {}{}.png".format(args.outfiles,str(t_idx).zfill(4),args.outfiles,str(t_idx).zfill(4)))
                 #if t_idx ==2: exit(0)
             else:
                 #view = pv.GetActiveView()
