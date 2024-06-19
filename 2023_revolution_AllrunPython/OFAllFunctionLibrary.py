@@ -219,7 +219,10 @@ class Case(object):
             f.write(stdout)
             f.write(stderr)
         # rm -f constant/polyMesh/faceZones.gz
-        os.remove("0/meshPhi*")
+        redundant_files = glob.glob("0/meshPhi*")
+        if redundant_files:
+            for i in redundant_files:
+                os.remove(i)
     
     def checkMesh(self):
         print("checkMesh-ing...")
