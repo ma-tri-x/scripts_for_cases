@@ -878,7 +878,7 @@ class Case(object):
         xzdims = self._grep("log.checkMesh","Overall domain bounding box")[0].split("(")[2].split(")")[0].split()[1:3]
         THETA = np.arctan(float(xzdims[1])/float(xzdims[0]))/np.pi*180.
         with open("THETA","w") as f:
-            f.write(THETA)
+            f.write(str(THETA))
             
             
     def collapseEdges(self):
