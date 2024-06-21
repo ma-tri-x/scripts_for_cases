@@ -875,8 +875,8 @@ class Case(object):
             f.write(stdout)
             f.write(stderr)
         self.checkMesh()
-        xzdims = self._grep("log.checkMesh","Overall domain bounding box")[0].split("(")[2].split(")")[0].split()[1:3]
-        THETA = np.arctan(float(xzdims[1])/float(xzdims[0]))/np.pi*180.
+        xyzdims = self._grep("log.checkMesh","Overall domain bounding box")[0].split("(")[2].split(")")[0].split()[0:3]
+        THETA = np.arctan(float(xyzdims[2])/float(xyzdims[0]))/np.pi*180.
         with open("THETA","w") as f:
             f.write(str(THETA))
             
