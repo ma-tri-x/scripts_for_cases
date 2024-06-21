@@ -869,12 +869,17 @@ class Case(object):
             j = j + 1
         
     def makeAxialMesh(self):
+        print("making axial mesh and checkMesh-ing for correct THETA")
         stdout,stderr = self._run_system_command("makeAxialMesh -axis axis -wedge frontandback -overwrite -wedgeAngle 4.0")
         with open(f"log.makeAxialMesh","w") as f:
             f.write(stdout)
             f.write(stderr)
+        self.checkMesh()
+        xzdims = self._grep("log.checkMesh","Overall domain bounding box")[0].split("(")[2].split(")")[0].split()[1:3]
+        THETA = np.arctan(float(xzdims[1])/float(xzdims[0]))/np.pi*180.
         with open("THETA","w") as f:
-            f.write("2.0")
+            f.write(THETA)
+            
             
     def collapseEdges(self):
         stdout,stderr = self._run_system_command("collapseEdges 1e-8 180 -overwrite")
