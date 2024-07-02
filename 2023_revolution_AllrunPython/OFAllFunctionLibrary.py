@@ -813,8 +813,86 @@ class Case(object):
             print(f"rm -rf {latestRefineFolder}")
             self._run_system_command(f"rm -rf {latestRefineFolder}")
             j = j + 1
+      
+    def refineMesh2D(self):
+        print("prepare refining mesh...")
+        n0 = self.conf_dict["mesh"]["startCellAmount"]
+        csgoal = self.conf_dict["mesh"]["cellSize"]
+        xSize = self.conf_dict["mesh"]["xSize"]
+        ySize = self.conf_dict["mesh"]["ySize"]
+        #define(XF,_MESH-YSIZE)              // mesh end (domain C)
+        #define(XFx,_MESH-XSIZE)              // mesh end (domain C)
+        #define(NUM,calc(round((_MESH-STARTCELLAMOUNT*XFx/XF)**(1./2.))))              // mesh end (domain C)
+        #define(NUMx, NUM)
+        #define(NUMy, calc(round(NUM*XF/XFx)))
+        NUMx = round((n0*xSize/ySize)**(1./2.))
+        edge_length = xSize/NUMx
+        iterations = round(np.log(edge_length/csgoal)/np.log(2.))
+        print(f"number of iterations: {iterations}")
+        shutil.copy2("system/refineMeshDict.2D","system/refineMeshDict")
+        if iterations > 13:
+            print(f"Error in refineMesh prep.: impossible number of iterations: {iterations} > 13")
+            exit(1)
+        refineUntil = self.conf_dict["refine"]["refineUntil"]
+        refineFrom = self.conf_dict["refine"]["refineFrom"]
             
+        j=1
+        while j < iterations + 1:
+            print(f"cp system cellSetDict.1.backup system/cellSetDict.{j}")
+            shutil.copy2("system/cellSetDict.1.backup",f"system/cellSetDict.{j}")
+            cellSetCenter = self.bubble_center
+            self._sed(f"system/cellSetDict.{j}","dinit","{}".format(cellSetCenter))
+            refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
+            ec_curr = edge_length/2**j 
+            print(f"refine radius: {refDist}, edge_length approx: {ec_curr}")
+            self._sed(f"system/cellSetDict.{j}","rrradius","{}".format(refDist))
+            j = j + 1
+        j=1
+        while j < iterations + 1:
+            print(f"cellSetting {j}...")
+            shutil.copy2(f"system/cellSetDict.{j}","system/cellSetDict")
+            stdout,stderr = self._run_system_command("cellSet")
+            with open(f"log.cellSet.{j}","w") as f:
+                f.write(stdout)
+                f.write(stderr)
+            print("refining mesh...")
+            stdout,stderr = self._run_system_command("refineMesh -dict")
+            with open(f"log.refineMesh.{j}","w") as f:
+                f.write(stdout)
+                f.write(stderr)
+            latestRefineFolder = self.find_biggestNumber(proc_path=".")
+            content = glob.glob(f"{latestRefineFolder}/polyMesh/*")
+            for i in content:
+                stdout,stderr = self._run_system_command(f"cp -r {i} constant/polyMesh/")
+            print(f"rm -rf {latestRefineFolder}")
+            self._run_system_command(f"rm -rf {latestRefineFolder}")
+            j = j + 1
         
+    def makeAxialMesh(self):
+        print("making axial mesh and checkMesh-ing for correct THETA")
+        stdout,stderr = self._run_system_command("makeAxialMesh -axis axis -wedge frontandback -overwrite -wedgeAngle 4.0")
+        with open(f"log.makeAxialMesh","w") as f:
+            f.write(stdout)
+            f.write(stderr)
+        self.checkMesh()
+        xyzdims = self._grep("log.checkMesh","Overall domain bounding box")[0].split("(")[2].split(")")[0].split()[0:3]
+        THETA = np.arctan(float(xyzdims[2])/float(xyzdims[0]))/np.pi*180.
+        with open("THETA","w") as f:
+            f.write(str(THETA))
+            
+            
+    def collapseEdges(self):
+        stdout,stderr = self._run_system_command("collapseEdges 1e-8 180 -overwrite")
+        with open(f"log.collapseEdges","w") as f:
+            f.write(stdout)
+            f.write(stderr)
+    
+    def changeDictionary(self):
+        stdout,stderr = self._run_system_command("changeDictionary")
+        with open(f"log.changeDictionary","w") as f:
+            f.write(stdout)
+            f.write(stderr)
+    
     def _path_is_num(self,path):
         try:
             float(path)
