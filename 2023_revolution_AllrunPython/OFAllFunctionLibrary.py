@@ -675,6 +675,7 @@ class Case(object):
         spheres_geometry_str = ""
         regions_refine_str = ""
         if not refineBubblePart == False:
+            print("--- preparing snappyHexMeshDict for refinement instead of refineMesh")
             n0 = self.conf_dict["mesh"]["startCellAmount"]
             csgoal = self.conf_dict["mesh"]["cellSize"]
             xSize = self.conf_dict["mesh"]["xSize"]
@@ -685,7 +686,7 @@ class Case(object):
             iterations = round(np.log(edge_length/csgoal)/np.log(2.))
             print(f"number of iterations: {iterations}")
             
-            if iterations > 13:
+            if iterations > 14:
                 print(f"Error in refineMesh prep.: impossible number of iterations: {iterations} > 13")
                 exit(1)
             refineUntil = self.conf_dict["refine"]["refineUntil"]
@@ -693,12 +694,15 @@ class Case(object):
                 
             
             j=1
+            edge_lengths = []
+            radii = []
             while j < iterations + 1:
-                print("--- preparing snappyHexMeshDict for refinement instead of refineMesh")
                 cellSetCenter = refinementCenter #self.bubble_center
                 refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
                 ec_curr = edge_length/2**j 
-                print(f"refine (snappy) radius: {refDist}, edge_length approx: {ec_curr}")
+                edge_lengths.append(ec_curr)
+                radii.append(refDist)
+                print("refine (snappy) radius: {:.9f}, edge_length approx: {:.9f}".format(refDist,ec_curr))
                 sphere_str = "sphere{}\n\
                 {{\n\
                     type searchableSphere;\n\
@@ -714,8 +718,23 @@ class Case(object):
                 spheres_geometry_str = "{}{}".format(spheres_geometry_str,sphere_str)
                 regions_refine_str = "{}{}".format(regions_refine_str,region_str)
                 j = j + 1
+                
+            total_cells_projected = 0
+            radii.reverse()
+            edge_lengths.reverse()
+            for i,refRad in enumerate(radii):
+                if i == 0: n = int(4./3*np.pi*refRad**3/edge_lengths[0]**3)
+                else:
+                    n = int(4./3*np.pi*(refRad - radii[i-1])**3/edge_lengths[i]**3)
+                total_cells_projected = total_cells_projected + n
+                print("cells in the {}th layer: {}\t refRad: {:.9f}, edge_length: {:.9f}".format(i,n,refRad, edge_lengths[i]))
+            total_cells_projected = total_cells_projected + n0
+            print("PROJECTED cell amount approx.: {}".format(total_cells_projected))
+                
+            
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINESNAPPYSPHERES",spheres_geometry_str)
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINEMENTREGIONS",regions_refine_str)
+        
         
         ### -- extra objects part:
         extraObjGeos_str = ""
