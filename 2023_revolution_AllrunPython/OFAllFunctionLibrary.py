@@ -262,7 +262,7 @@ class Case(object):
                 os.remove(i)
         content = glob.glob("0/uniform")
         if content:
-            shutil.rmtree("0/uniform")
+            os.removedirs("0/uniform")
         #self.copy_0backup()
         print("snappyHexMesh-ing...")
         if debug:
@@ -272,44 +272,6 @@ class Case(object):
         with open("log.snappyHexMesh","w") as f:
             f.write(stdout)
             f.write(stderr)
-        self.copy_0backup()
-        
-    def parallelSnappyHexMesh(self,debug=False):
-        self.clear_polyMesh_for_Snappy()
-        threads = self.conf_dict["decompose"]["threads"]
-        
-        if not self.copied_snappyHexMeshDict_already:
-            shutil.copy2("system/{}".format(self.conf_dict["snappy"]["snappyScript"]),"system/snappyHexMeshDict")
-            self.copied_snappyHexMeshDict_already = True
-        print("preparing snappyHexMesh...")
-        content = glob.glob("0/*.gz")
-        if content:
-            for i in content:
-                os.remove(i)
-        content = glob.glob("0/uniform")
-        if content:
-            os.removedirs("0/uniform")
-        #self.copy_0backup()
-        print("decomposing with hierarchical for snappy...")
-        shutil.copy2("system/decomposeParDict_hierarchical","system/decomposeParDict")
-        stdout,stderr = self._run_system_command("decomposePar")
-        with open("log.decomposeForSnappy","w") as f:
-            f.write(stdout)
-            f.write(stderr)
-        print("snappyHexMesh-ing in parallel...")
-        if debug:
-            stdout,stderr = self._run_system_command(f"mpirun -np {threads} snappyHexMesh -parallel")
-        else:
-            stdout,stderr = self._run_system_command(f"mpirun -np {threads} snappyHexMesh -parallel -overwrite")
-        with open("log.snappyHexMesh","w") as f:
-            f.write(stdout)
-            f.write(stderr)
-            
-        stdout,stderr = self._run_system_command("reconstructPar -latestTime")
-        with open("log.reconstruct","w") as f:
-            f.write(stdout)
-            f.write(stderr)
-        shutil.copy2("system/decomposeParDict_normal","system/decomposeParDict")
         self.copy_0backup()
         
     def run_funkySetFields_command(self,field,expression,condition):
@@ -763,7 +725,7 @@ class Case(object):
             for i,refRad in enumerate(radii):
                 if i == 0: n = int(4./3*np.pi*refRad**3/edge_lengths[0]**3)
                 else:
-                    n = int(4./3*np.pi*(refRad - radii[i-1])**3/edge_lengths[i]**3)
+                    n = int(4./3*np.pi*(refRad**3 - radii[i-1]**3)/edge_lengths[i]**3)
                 total_cells_projected = total_cells_projected + n
                 print("cells in the {}th layer: {}\t refRad: {:.9f}, edge_length: {:.9f}".format(i,n,refRad, edge_lengths[i]))
             total_cells_projected = total_cells_projected + n0
