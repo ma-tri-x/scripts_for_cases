@@ -34,13 +34,30 @@ geometry
 //         max (_SNAPPY-RPISTON -_BUBBLE-D_INIT 1);
 //     }
 
-    _ALLRUNPY-OBJECTS
-    
-    _ALLRUNPY-EXTRAOBJECTSGEOMETRY
-    
-    _ALLRUNPY-EXTRAREGIONSGEOMETRY
+    _CAD-OBJECT
+    {
+        type triSurfaceMesh;
 
-    _ALLRUNPY-REFINESNAPPYSPHERES
+        //tolerance   1E-5;   // optional:non-default tolerance on intersections
+        //maxTreeDepth 10;    // optional:depth of octree. Decrease only in case
+                              // of memory limitations.
+
+        // Per region the patchname. If not provided will be <name>_<region>.
+        regions
+        {
+            patch0
+            {
+                name box1x1x1_region0;
+            }
+        }
+    }
+
+//     sphere1
+//     {
+//         type searchableSphere;
+//         centre  (0 0 0);
+//         radius  1.2e-3;
+//     }
     
 };
 
@@ -78,7 +95,7 @@ castellatedMeshControls
     // Number of buffer layers between different levels.
     // 1 means normal 2:1 refinement restriction, larger means slower
     // refinement.
-    nCellsBetweenLevels 4;
+    nCellsBetweenLevels 2;
 
     // Explicit feature edge refinement
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -104,16 +121,35 @@ castellatedMeshControls
 
     refinementSurfaces
     {
-        _ALLRUNPY-REFINESURFACES
-        
-        _ALLRUNPY-EXTRAOBJECTSREFINE
+        _CAD-OBJECT
+        {
+            // Surface-wise min and max refinement level
+            level (3 8);
+
+            // Optional region-wise level specification
+//             regions
+//             {
+//                 patch0
+//                 {
+//                     level (3 3);
+//                 }
+//             }
+
+            // Optional angle to detect small-large cell situation perpendicular
+            // to the surface. Is the angle of face w.r.t the local surface
+            // normal. Use on flat(ish) surfaces only. Otherwise
+            // leave out or set to negative number.
+            //perpendicularAngle 10;
+        }
         
         box1x1x1
         {
             level (0 0);
         }
-
-        
+//         sphere2
+//         {
+//             level (8 10);
+//         }
     }
 
     resolveFeatureAngle 30;
@@ -133,10 +169,16 @@ castellatedMeshControls
 
     refinementRegions
     {
-        _ALLRUNPY-REFINEMENTREGIONS
-        
-        _ALLRUNPY-EXTRAREGIONSREFINE
-        
+        sphere1
+        {
+            mode inside;
+            levels ((1E15 1));
+        }
+        sphere2
+        {
+            mode inside;
+            levels ((1E15 2));
+        }
 //         box1x1x1
 //         {
 //             mode distance;
