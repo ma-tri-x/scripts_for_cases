@@ -262,7 +262,8 @@ class Case(object):
                 os.remove(i)
         content = glob.glob("0/uniform")
         if content:
-            os.removedirs("0/uniform")
+            #os.removedirs("0/uniform") # fails if not empty
+            shutil.rmtree("0/uniform")
         #self.copy_0backup()
         print("snappyHexMesh-ing...")
         if debug:
