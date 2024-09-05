@@ -681,9 +681,13 @@ class Case(object):
             csgoal = self.conf_dict["mesh"]["cellSize"]
             xSize = self.conf_dict["mesh"]["xSize"]
             ySize = self.conf_dict["mesh"]["ySize"]
-            zSize = self.conf_dict["mesh"]["zSize"]
-            Vc = xSize*ySize*zSize/n0
-            edge_length = Vc**(1./3.)
+            if self.conf_dict["mesh"]["meshDims"] == "3D":
+                zSize = self.conf_dict["mesh"]["zSize"]
+                Vc = xSize*ySize*zSize/n0
+                edge_length = Vc**(1./3.)
+            else:
+                Vc = xSize*ySize/n0
+                edge_length = np.sqrt(Vc)
             iterations = round(np.log(edge_length/csgoal)/np.log(2.))
             print(f"number of iterations: {iterations}")
             
@@ -857,6 +861,8 @@ class Case(object):
         refineFrom = self.conf_dict["refine"]["refineFrom"]
             
         j=1
+        edge_lengths = []
+        radii = []
         while j < iterations + 1:
             print(f"cp system cellSetDict.1.backup system/cellSetDict.{j}")
             shutil.copy2("system/cellSetDict.1.backup",f"system/cellSetDict.{j}")
@@ -864,9 +870,25 @@ class Case(object):
             self._sed(f"system/cellSetDict.{j}","dinit","{}".format(cellSetCenter))
             refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
             ec_curr = edge_length/2**j 
+            radii.append(refDist)
+            edge_lengths.append(ec_curr)
             print(f"refine radius: {refDist}, edge_length approx: {ec_curr}")
             self._sed(f"system/cellSetDict.{j}","rrradius","{}".format(refDist))
             j = j + 1
+        
+        total_cells_projected = 0
+        radii.reverse()
+        edge_lengths.reverse()
+        n0 = int(self.conf_dict["mesh"]["startCellAmount"])
+        for i,refRad in enumerate(radii):
+            if i == 0: n = int(np.pi*refRad**2/edge_lengths[0]**2)
+            else:
+                n = int(np.pi*(refRad**2 - radii[i-1]**2)/edge_lengths[i]**2)
+            total_cells_projected = total_cells_projected + n
+            print("cells in the {}th layer: {}\t refRad: {:.9f}, edge_length: {:.9f}".format(i,n,refRad, edge_lengths[i]))
+        total_cells_projected = total_cells_projected + n0
+        print("PROJECTED cell amount approx.: {}".format(total_cells_projected))
+        
         j=1
         while j < iterations + 1:
             print(f"cellSetting {j}...")
