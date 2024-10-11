@@ -3,6 +3,7 @@
 import os, sys, argparse, glob, time
 import numpy as np
 import subprocess, json, shutil, re
+import open3d as o3d
 #from meshespython import AbcMesh
 
 class Case(object):
@@ -169,7 +170,14 @@ class Case(object):
                 self._mkdir_if_not_exists("constant/triSurface")
                 for obj in self.conf_dict["CAD"]["objects"]:
                     shutil.copy2("CAD/{}".format(obj),"constant/triSurface/")
-                    self.change_obj_file_to_meter(obj)
+                    obj_file = obj
+                    if ".stl" in obj:
+                        obj_file = obj.replace(".stl",".obj")
+                        self.convert_stl_to_obj("constant/triSurface/{}".format(obj))
+                        #self.conf_dict["CAD"]["objects"].remove(obj)
+                        #self.conf_dict["CAD"]["objects"].append(obj_file)
+                    self.change_obj_file_to_meter(obj_file)
+                    #shutil.copy2("CAD/{}".format(obj_file),"constant/triSurface/")
             except:
                 print("WARNING: couldn't copy CAD/{}".format(self.conf_dict["CAD"]["objects"]))
     
@@ -232,6 +240,13 @@ class Case(object):
             f.write(stderr)
         self.nCellsCM = self._grep("log.checkMesh","cells:")[0].replace("cells:","")
         print("cells now: ",self.nCellsCM)
+        
+    def convert_stl_to_obj(self,stl_file):
+        print("changing stl to obj...")
+        mesh = o3d.io.read_triangle_mesh(stl_file)
+        obj_file = stl_file.replace(".stl",".obj")
+        o3d.io.write_triangle_mesh(obj_file, mesh)
+        return obj_file
         
     def change_obj_file_to_meter(self,geometry):
         geometry = geometry
@@ -649,6 +664,7 @@ class Case(object):
         objects_str = ""
         surfaces_refinement_str = ""
         for i,obj in enumerate(self.conf_dict["CAD"]["objects"]):
+            obj_no_stl = obj.replace(".stl",".obj")
             obj_str = "{}\n\
             {{\n\
                 type triSurfaceMesh;\n\
@@ -659,14 +675,14 @@ class Case(object):
                         name box1x1x1_region0;\n\
                     }}\n\
                 }}\n\
-            }}\n".format(obj)
+            }}\n".format(obj_no_stl)
             objects_str = "{}{}".format(objects_str,obj_str)
             
             surface_ref_str = "{}\n\
             {{\n\
                 // Surface-wise min and max refinement level\n\
                 level {};\n\
-            }}\n".format(obj,self.conf_dict["snappy"]["refineObjectsLevels"][i])
+            }}\n".format(obj_no_stl,self.conf_dict["snappy"]["refineObjectsLevels"][i])
             surfaces_refinement_str = "{}{}".format(surfaces_refinement_str,surface_ref_str)
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-OBJECTS",objects_str)
         self._sed("system/snappyHexMeshDict","_ALLRUNPY-REFINESURFACES",surfaces_refinement_str)
