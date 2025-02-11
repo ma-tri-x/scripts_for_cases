@@ -468,6 +468,26 @@ class Case(object):
         self.Rn = Rndiscr
         self.pn = pndiscr
         self.R0 = Rdiscr
+        #
+        self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
+        
+    def replace_variable_in_OF_dict(self,OF_file,subdict,var_string,value):
+        with open(OF_file,"r") as f:
+            lines = f.readlines()
+        isInSubdict = False
+        for i,line in enumerate(lines):
+            if subdict == "": 
+                isInSubdict = True
+            else:
+                if subdict in line: isInSubdict = True
+                if "}" in line and isInSubdict: isInSubdict = False
+            if f" {var_string} " in line and isInSubdict:
+                beginning = line.split("]")[0]
+                updated_line = f"{beginning}] {value};\n"
+                lines[i] = updated_line
+        with open(OF_file,"w") as fd:
+            fd.writelines(lines)
+                
         
     def adapt_pV(self):
         print("---- setting pressure with same adiabatic constant for discretization ----")
