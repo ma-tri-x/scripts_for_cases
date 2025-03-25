@@ -7,6 +7,14 @@ echo "Building ParaView 4.4.0"
                 -f --define='_qmakePath $QT_BIN_DIR/qmake'
             )
 
+## solved issue with vtkPythonArgs.cxx cast const char* to char but now installed python2 and linked python to python2.7. Let's see!
+## mind to install libpython2-dev!
+#cp vtkPythonArgs.cxx rpmBuild/BUILD/ParaView-v4.4.0-source/VTK/Wrapping/PythonCore/vtkPythonArgs.cxx
+
+
+cp GenerateExportHeader.cmake ./rpmBuild/BUILD/ParaView-v4.4.0-source/VTK/CMake/GenerateExportHeader.cmake
+cp vtkCompilerExtras.cmake ./rpmBuild/BUILD/ParaView-v4.4.0-source/VTK/CMake/vtkCompilerExtras.cmake
+cp vtkModuleMacrosPython.cmake ./rpmBuild/BUILD/ParaView-v4.4.0-source/VTK/CMake/vtkModuleMacrosPython.cmake
 sed -i "s/MATCH \"\[345\]/MATCH \"\[3459\]/g" ./rpmBuild/BUILD/ParaView-v4.4.0-source/VTK/CMake/vtkCompilerExtras.cmake
 sed -i "s/MATCH \"\[345\]/MATCH \"\[3459\]/g" ./rpmBuild/BUILD/ParaView-v4.4.0-source/VTK/CMake/GenerateExportHeader.cmake
 
@@ -27,4 +35,8 @@ cmake ..
 
 make
 make install
+# IF paraview compilation stops at 97% stating ::acos was not found, go to
+# cd ~/foam/foam-extend-4.1/ThirdParty/rpmBuild/BUILD/ParaView-v4.4.0-source/buildObj 
+# find . -name VolumeAttributes.cpp
+# and add there #include <math.h>
 cd $thisdir

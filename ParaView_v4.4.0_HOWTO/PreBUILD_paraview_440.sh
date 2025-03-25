@@ -1,6 +1,8 @@
 #done before Build:
-# add repository for qt4
-sudo add-apt-repository ppa:rock-core/qt4
+# add repository for qt4 for Ubuntu 20.04
+#sudo add-apt-repository ppa:rock-core/qt4
+#for Ubuntu 22.04:
+sudo add-apt-repository ppa:ubuntuhandbook1/ppa
 #install qt4
 sudo apt install cmake gcc g++ qt{4,5}-qmake libqt4-dev
 sudo apt install qt4-dev-tools
