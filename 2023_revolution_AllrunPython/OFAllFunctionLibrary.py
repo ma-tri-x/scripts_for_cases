@@ -326,6 +326,14 @@ class Case(object):
         expression=f"{self.sq_x} + {self.sq_y}*{e_x}*{e_x} < {Rx} * {Rx} ?0:1"
         self.run_funkySetFields_command("alpha1",expression,"")
         
+    def set_alpha_field_ellipse_3D_abc(self):
+        print("----- setting alpha1 field ellipse 3D a,b,c axes ------")
+        axisA = self.conf_dict["bubble"]["axisA"]
+        axisB = self.conf_dict["bubble"]["axisB"]
+        axisC = self.conf_dict["bubble"]["axisC"]
+        expression=f"{self.sq_x}/{axisA}/{axisA} + {self.sq_y}/{axisB}/{axisB} + {self.sq_z}/{axisC}/{axisC} < 1 ?0:1"
+        self.run_funkySetFields_command("alpha1",expression,"")
+        
     def set_alpha_field_Vogel(self):
         print("--- setting alpha1 to Vogel guide tip bubble")
         heightOfVogelBubble = self.conf_dict["bubble"]["heightOfVogelBubble"]
