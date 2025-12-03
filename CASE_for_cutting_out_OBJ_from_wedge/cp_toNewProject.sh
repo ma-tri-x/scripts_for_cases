@@ -22,4 +22,9 @@ cp $thisdir/*.py $destDir
 cp $thisdir/*.gnuplot $destDir
 cp $thisdir/All* $destDir
 cp $thisdir/*.json $destDir
+cp $thisdir/LUT_R0_Rn_Rmax.dat $destDir
+if [ -d $thisdir/GilmoreODEsolver ];then cp -r $thisdir/GilmoreODEsolver $destDir;fi
 if [ -d $thisdir/states ];then cp -r $thisdir/states $destDir;fi
+if [ -d $thisdir/CAD ];then cp -r $thisdir/CAD $destDir;fi
+if [ -d $thisdir/gilmore_runs ];then cp -r $thisdir/gilmore_runs $destDir;fi
+if [ -d $thisdir/meshespython ];then cp -r $thisdir/meshespython $destDir;fi
