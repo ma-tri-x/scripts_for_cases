@@ -1,0 +1,81 @@
+#!/bin/python
+
+import os, sys, argparse, glob, time,json
+import numpy as np
+import OFAllFunctionLibrary as OAFL
+import subprocess
+from meshespython import *
+
+def main():
+    """
+    changed library so that Case and Mesh are independent and point(!)
+    to the dictionary "conf_dict" loaded HERE in Allrun.py. So conf_dict can be prepared here:
+    preparation:
+    """
+    conf_dict = {}
+    with open("conf_dict.json","r") as f:
+        conf_dict = json.load(f)
+        
+    """
+    now setting up the case and mesh with the prepared conf_dict
+    """
+    case = OAFL.Case(conf_dict)
+    case.Allclean()
+    case.write_template_files_to_OF_files() # *template --> OF files now happening here!
+    case.copy_0backup()
+    
+    #mesh = simple_rect_3D_V2.MeshCalcer(conf_dict)
+    #mesh.calc_mesh()
+    #mesh.write_blockMeshDict()
+    
+    case.m4Mesh()
+    
+    #mesh.write_blockMeshDict()
+    
+    case.blockMesh()
+    
+    #case.stitchMesh()
+    case.refineMesh2D()
+    
+    #case.makeAxialMesh()
+    #case.collapseEdges()
+    
+    #case.copy_0backup()
+    
+    #case.changeDictionary()
+    #case.stitchMesh()
+    #cutting away cylinder:
+    case.prepare_snappyHexMeshDict_CAD_and_bubble(refineBubblePart=False)
+    case.snappyHexMesh()
+    #os.system("sed -i \"s/side/side_withG/g\" constant/polyMesh/blockMeshDict")
+    #os.system("sed -i \"s/_ALLRUN-BCAMPLITUDE/0.0/g\" 0/p_rgh")
+    #os.system("sed -i \"s/(0 -9.81 0)/(0 0 0)/g\" constant/g")
+    
+    
+    case.makeAxialMesh()
+    case.collapseEdges()
+    
+    case.copy_0backup()
+    
+    case.changeDictionary()
+    
+    case.set_U_field_zero()
+    
+    #rho_l0 = case.conf_dict["liquid"]["rho"]
+    #gVector = case.conf_dict["gravity"]["g"].replace(" ",",")
+    #case.run_funkySetFields_command(case.pVar,f"{case.pInf} + {rho_l0}*(vector{gVector} & vector(pos().x,pos().y,pos().z))","")
+    
+    #case.set_alpha_field_bubble()
+    print(f"---- setting alpha1 field for a bubble with R0 = {case.R0} at D_init = {case.bubble_center} ----")
+    virtualRstart = _CREATE-VIRTUALRSTART
+    case.run_funkySetFields_command("alpha1",f"0.5*(tanh(({case.radial_distance}-{virtualRstart})*5.9/{case.widthOfInterface})+1)","")
+    #case.set_alpha_field_ellipse_3D_abc()
+    case.adapt_energy_LUT()
+    case.write_aimedRn_to_transportProperties()
+    case.set_passiveScalar_layeredColors()
+    
+    case.decompose()
+    
+
+if __name__=="__main__":
+    main()
