@@ -434,9 +434,9 @@ class Case(object):
         return Rn_new    
     
     def adapt_energy(self):
-        print("---- ERROR: function adapt_energy is deprepaced. ----")
+        print("---- WARNING: function adapt_energy is deprepaced!!!! ----")
         print("---- use adapt_energy_LUT instead ----")
-        exit(1)
+        print("---- (unless liquid pressure is not 101315 Pa) ----")
         
         print("---- setting pressure with same energy for discretization ----")
         p_init = self.pBubble # pBubble includes pV, pn doesn't
@@ -484,6 +484,11 @@ class Case(object):
         self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
         
     def adapt_energy_LUT(self):
+        if not self.pInf == 101315.0:
+            print("ERROR in adapt_energy_LUT: pInf != 101315.0")
+            print("ERROR in adapt_energy_LUT: LUT not done for other pInfs")
+            exit(1)
+            
         true_alpha2_vol = self.get_alpha2_vol_t0()
         Vinitdiscr = true_alpha2_vol
         
