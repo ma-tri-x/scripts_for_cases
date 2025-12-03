@@ -537,6 +537,9 @@ class Case(object):
         #
         self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
         
+    def write_aimedRn_to_transportProperties(self,percent=64./184.1):
+        aimedRn = percent* self.Rn
+        self._sed("constant/transportProperties","_OFALLFUNC-AIMEDRN",f"{aimedRn}")
         
             
     def replace_variable_in_OF_dict(self,OF_file,subdict,var_string,value):

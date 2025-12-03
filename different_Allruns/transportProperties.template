@@ -19,12 +19,14 @@ gas
 {
     mu                   mu    [1 -1 -1 0 0 0 0] _GAS-MU;
     gamma                gamma [0 0 0 0 0 0 0] _GAS-GAMMA;
-    beta                 beta  [0 0 0 0 0 0 0] 0.0;
+    beta                 beta  [0 0 0 0 0 0 0] _GAS-BETA;
     Rn                   Rn    [0 1 0 0 0 0 0] _BUBBLE-RN;
-    aimedRn            aimedRn [0 1 0 0 0 0 0] _ALLRUN-AIMEDRN;
+    aimedRn            aimedRn [0 1 0 0 0 0 0] _OFALLFUNC-AIMEDRN;
     pMin                 pMin  [1 -1 -2 0 0 0 0] _GAS-PMIN; // 2337;
     specGasConst  specGasConst [0 2 -2 -1 0 0 0] _GAS-SPECGASCONST; //287.
     RMax                 RMax  [0 1 0 0 0 0 0] _BUBBLE-RMAX;
+    pV                   pV    [1 -1 -2 0 0 0 0] _GAS-PV;
+    specGasConstVapour  specGasConstVapour [0 2 -2 -1 0 0 0] _GAS-VAPOURSPECGASCONST; //287.
 }
 
 liquid
