@@ -334,6 +334,23 @@ class Case(object):
         expression=f"{self.sq_x}/{axisA}/{axisA} + {self.sq_y}/{axisB}/{axisB} + {self.sq_z}/{axisC}/{axisC} < 1 ?0:1"
         self.run_funkySetFields_command("alpha1",expression,"")
         
+    def set_alpha_field_ellipse_3D_abc_offset_xy(self,offset_x,offset_y,axisA,axisB,axisC):
+        print("----- setting alpha1 field ellipse 3D a,b,c axes and offset xy ------")
+        #axisA = self.conf_dict["bubble"]["axisA"]
+        #axisB = self.conf_dict["bubble"]["axisB"]
+        #axisC = self.conf_dict["bubble"]["axisC"]
+        sq_x = f"(({self.x_coord}-{offset_x})*({self.x_coord}-{offset_x}))"
+        sq_y = f"(({self.y_coord}-{offset_y})*({self.y_coord}-{offset_y}))"
+        expression=f"{sq_x}/{axisA}/{axisA} + {sq_y}/{axisB}/{axisB} + {self.sq_z}/{axisC}/{axisC} < 1 ?0:alpha1"
+        self.run_funkySetFields_command("alpha1",expression,"")
+        
+    def set_alpha_field_bubble_R_offset_xy(self,R,offset_x,offset_y):
+        print(f"---- setting alpha1 field for a bubble with R0 = {R} at x,y = {offset_x},{offset_y} ----")
+        sq_x = f"(({self.x_coord}-{offset_x})*({self.x_coord}-{offset_x}))"
+        sq_y = f"(({self.y_coord}-{offset_y})*({self.y_coord}-{offset_y}))"
+        radial_distance = f"sqrt({sq_x} + {sq_y} + {self.sq_z})"
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({radial_distance}-{R})*5.9/{self.widthOfInterface})+1)","")
+        
     def set_alpha_field_Vogel(self):
         print("--- setting alpha1 to Vogel guide tip bubble")
         heightOfVogelBubble = self.conf_dict["bubble"]["heightOfVogelBubble"]
@@ -521,6 +538,68 @@ class Case(object):
         #now finding Rn in LUT fitting to Rdiscr and Rmax
         LUT = np.loadtxt("LUT_R0_Rn_Rmax.dat")
         search_function = np.abs(LUT[:,0]-Rdiscr) + np.abs(LUT[:,2]-Rmax_wanted)
+        find_index = np.argmin(search_function)
+        R0_found = LUT[:,0][find_index]
+        Rn_found = LUT[:,1][find_index]
+        Rmax_found = LUT[:,2][find_index]
+        
+        print("... adapt_energy: found R0  ={}".format(R0_found))
+        print("... adapt_energy: found Rn  ={}".format(Rn_found))
+        print("... adapt_energy: found Rmax={}".format(Rmax_found))
+        
+        print("pBubble_old = {}".format(self.pBubble))
+        self.R0 = R0_found
+        self.Rn = Rn_found
+        self.pn = self.pInf + 2.*self.sigma/self.Rn - self.pV
+        self.pBubble = self.pn * ((self.Rn**3. - self.beta*self.Rn**3.)/(self.R0**3. - self.beta*self.Rn**3.))**self.gamma + self.pV 
+        print("pBubble_new = {}".format(self.pBubble))
+        
+        expression = f"{self.pBubble}*(1.-alpha1)+{self.pVar}*alpha1"
+        self.run_funkySetFields_command(self.pVar,expression,"")
+        #
+        self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
+        
+    def adapt_energy_LUT_fromR0Rn(self):
+        if not self.pInf == 101315.0:
+            print("ERROR in adapt_energy_LUT: pInf != 101315.0")
+            print("ERROR in adapt_energy_LUT: LUT not done for other pInfs")
+            exit(1)
+            
+        true_alpha2_vol = self.get_alpha2_vol_t0()
+        Vinitdiscr = true_alpha2_vol
+        
+        if self.conf_dict["mesh"]["meshDims"] == "2D":
+            print("... adapt_energy: calculating 2D volume")
+            theta = self.read_theta()
+            Vinitdiscr = true_alpha2_vol * 180. / theta
+        elif self.conf_dict["mesh"]["meshDims"] == "1D":
+            print("... adapt_energy: calculating 1D volume")
+            theta = self.read_theta()
+            theta_rad = theta * np.pi /180.
+            Vinitdiscr = true_alpha2_vol * np.pi / (np.tan(theta_rad))**2
+        
+        Rdiscr = (Vinitdiscr / (4.*np.pi)*3)**(1./3.)
+        print("... adapt_energy: R0_input = {}".format(self.R0))
+        print("... adapt_energy: Rdiscr   = {}".format(Rdiscr))
+        
+        #Rmax_wanted = self.conf_dict["bubble"]["Rmax"]
+        
+        print("... adapt_energy: Rn_input= {}".format(self.Rn))
+        
+        R0_min = 10e-6
+        R0_max = 200e-6
+        Rn_min = 120e-6
+        Rn_max = 340e-6
+        if Rdiscr < R0_min or Rdiscr > R0_max:
+            print("ERROR in adapt_energy_LUT: Rdiscr < R0_min or Rdiscr > R0_max")
+            exit(1)
+        if self.Rn < Rn_min or self.Rn > Rn_max:
+            print("ERROR in adapt_energy_LUT: Rn < Rn_min or Rn > Rn_max")
+            exit(1)
+            
+        #now finding Rn in LUT fitting to Rdiscr and Rmax
+        LUT = np.loadtxt("LUT_R0_Rn_Rmax.dat")
+        search_function = np.abs(LUT[:,0]-Rdiscr) + np.abs(LUT[:,1]-self.Rn)
         find_index = np.argmin(search_function)
         R0_found = LUT[:,0][find_index]
         Rn_found = LUT[:,1][find_index]
