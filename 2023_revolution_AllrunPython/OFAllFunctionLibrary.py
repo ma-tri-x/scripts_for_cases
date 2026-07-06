@@ -67,16 +67,7 @@ class Case(object):
         self.rho_min = self.rho_n * (self.Rn / self.Rmax)**3. 
         self.pBubble = self.pn * ((self.Rn**3. - self.beta*self.Rn**3.)/(self.R0**3. - self.beta*self.Rn**3.))**self.gamma + self.pV 
 
-        self.x_coord = "pos().x"
-        self.y_coord = "pos().y"
-        self.z_coord = "pos().z"
-        self.sq_x = f"({self.x_coord}*{self.x_coord})"
-        self.sq_y = f"(({self.y_coord}-{self.bubble_center})*({self.y_coord}-{self.bubble_center}))"
-        self.sq_z = f"({self.z_coord}*{self.z_coord})"
-
-        self.distance_vector = f"vector({self.z_coord}, {self.y_coord}, {self.z_coord})"
-        self.radial_distance = f"sqrt({self.sq_x} + {self.sq_y} + {self.sq_z})"
-        self.unit_vector = f"{self.distance_vector} / {self.radial_distance}"
+        self.relocate_funkySyntax_to_bubble_center(self.bubble_center)
 
         self.funkySetFieldsLog = "log.funkySetFields"
         with open(self.funkySetFieldsLog,"w") as f:
@@ -96,6 +87,22 @@ class Case(object):
                 self.copied_snappyHexMeshDict_already = True
         except(KeyError):
             self.copied_snappyHexMeshDict_already = True
+            
+    def relocate_funkySyntax_to_bubble_center(self,new_bubble_center):
+        self.x_coord = "pos().x"
+        self.y_coord = "pos().y"
+        self.z_coord = "pos().z"
+        self.sq_x = f"({self.x_coord}*{self.x_coord})"
+        self.sq_y = f"(({self.y_coord}-{new_bubble_center})*({self.y_coord}-{new_bubble_center}))"
+        self.sq_z = f"({self.z_coord}*{self.z_coord})"
+
+        self.distance_vector = f"vector({self.z_coord}, {self.y_coord}, {self.z_coord})"
+        self.radial_distance = f"sqrt({self.sq_x} + {self.sq_y} + {self.sq_z})"
+        self.unit_vector = f"{self.distance_vector} / {self.radial_distance}"
+        
+    def read_second_bubble_parms(self):
+        subdict = self.conf_dict["secondBubble"]
+        return subdict["D_init"],subdict["Rn"],subdict["Rstart"],subdict["Rmax"],subdict["tTransitStart"],subdict["dtTransit"]
             
     def Allclean(self):
         #stdout,stderr = self._run_system_command("bash Allclean")
@@ -316,6 +323,20 @@ class Case(object):
     def set_alpha_field_bubble(self):
         print(f"---- setting alpha1 field for a bubble with R0 = {self.R0} at D_init = {self.bubble_center} ----")
         self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{self.R0})*5.9/{self.widthOfInterface})+1)","")
+    
+    def set_alpha_field_doubleBubbles(self):
+        self.run_funkySetFields_command("alpha1","1.0","")
+        print(f"---- setting alpha1-One field for a bubble with R0 = {self.R0} at D_init = {self.bubble_center} ----")
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{self.R0})*5.9/{self.widthOfInterface})+1)","passiveScalar > 0.0")
+        
+        R0Two = self.conf_dict["secondBubble"]["Rstart"]
+        D_initTwo = self.conf_dict["secondBubble"]["D_init"]
+        self.relocate_funkySyntax_to_bubble_center(D_initTwo)
+        
+        print(f"---- setting alpha1-Two field for a bubble with R0 = {R0Two} at D_init = {D_initTwo} ----")
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{R0Two})*5.9/{self.widthOfInterface})+1)","passiveScalar < 0.0")
+        
+        self.relocate_funkySyntax_to_bubble_center(self.bubble_center)
         
     def set_alpha_field_ellipse(self):
         print("----- setting alpha1 field ellipse ------")
@@ -449,6 +470,22 @@ class Case(object):
         else:
             Rn_new = (p0/self.pInf)**(1./(3.*self.gamma))*Rdiscr
         return Rn_new    
+    
+    def adapt_energy_LUT_doubleBubbles(self):
+        print("---- WARNING: adapt_energy_LUT_doubleBubbles not yet implemented!!!! ----")
+        print("---- WARNING: using raw input pressures!!!! ----")
+        self.run_funkySetFields_command(self.pVar,f"{self.pBubble}*(1.-alpha1)+{self.pVar}*alpha1","passiveScalar > 0.0")
+        
+        D_initTwo, RnTwo, R0Two, RmaxTwo, t_aTwo, t_transitTwo = self.read_second_bubble_parms()
+        
+        pnTwo = self.pInf + 2.* self.sigma / RnTwo - self.pV  
+        rho_nTwo = pnTwo / (self.specGasConst * self.Tref * (1.- self.beta) )
+        rho_minTwo = rho_nTwo * (RnTwo / RmaxTwo)**3. 
+        pBubbleTwo = pnTwo * ((RnTwo**3. - self.beta*RnTwo**3.)/(R0Two**3. - self.beta*RnTwo**3.))**self.gamma + self.pV
+        
+        self.run_funkySetFields_command(self.pVar,f"{pBubbleTwo}*(1.-alpha1)+{self.pVar}*alpha1","passiveScalar < 0.0")
+        print(f"---- pBubbleOne = {self.pBubble} ----")
+        print(f"---- pBubbleTwo = {pBubbleTwo} ----")
     
     def adapt_energy(self):
         print("---- WARNING: function adapt_energy is deprepaced!!!! ----")
@@ -625,6 +662,12 @@ class Case(object):
         aimedRn = percent* self.Rn
         self._sed("constant/transportProperties","_OFALLFUNC-AIMEDRN",f"{aimedRn}")
         
+    def write_aimedRns_to_bubblesProperties(self,percent=64./184.1):
+        aimedRnOne = percent* self.Rn
+        self._sed("constant/BubblesProperties","_OFALLFUNC-AIMEDRN",f"{aimedRnOne}")
+        D_initTwo, RnTwo, R0Two, RmaxTwo, t_aTwo, t_transitTwo = self.read_second_bubble_parms()
+        aimedRnTwo = percent* RnTwo
+        self._sed("constant/BubblesProperties","_OFALLFUNC-SECONDBUBBLEAIMEDRN",f"{aimedRnTwo}")
             
     def replace_variable_in_OF_dict(self,OF_file,subdict,var_string,value):
         with open(OF_file,"r") as f:
@@ -673,6 +716,17 @@ class Case(object):
         print(f"---- passiveScalar part till Y: {Y} ----")
         self.run_funkySetFields_command("passiveScalar","1.0","")
         self.run_funkySetFields_command("passiveScalar",f"{self.y_coord}/{Y}",f"{self.y_coord} < {Y} ")
+        
+    def set_passiveScalar_layeredColors_doubleBubble(self):
+        D_initTwo = self.conf_dict["secondBubble"]["D_init"]
+        y_zero = 0.5*(self.bubble_center + D_initTwo)
+        Y_up = 1.5 * self.Rmax + self.bubble_center
+        Y_down = -(1.5 * self.conf_dict["secondBubble"]["Rmax"]) + D_initTwo
+        print(f"---- passiveScalar between {Y_up} and {Y_down} ----")
+        slope = 2.0/(Y_up - Y_down)
+        self.run_funkySetFields_command("passiveScalar",f"{slope}*({self.y_coord}-{y_zero})","")
+        self.run_funkySetFields_command("passiveScalar",f"{self.y_coord} > {Y_up} ? 1.0 : passiveScalar","")
+        self.run_funkySetFields_command("passiveScalar",f"{self.y_coord} < {Y_down} ? -1.0 : passiveScalar","")
         
     def set_passiveScalar_sinus_schlieren(self,radius_of_PS,ycenter_of_PS,num_per_180_deg):
         print("---- setting PS to sinus schlieren 3D")
@@ -1029,7 +1083,7 @@ class Case(object):
             self._run_system_command(f"rm -rf {latestRefineFolder}")
             j = j + 1
       
-    def refineMesh2D(self):
+    def refineMesh2D(self,cellSetCenter,cellSetDictBackup="cellSetDict.1.backup"):
         print("prepare refining mesh...")
         n0 = self.conf_dict["mesh"]["startCellAmount"]
         csgoal = self.conf_dict["mesh"]["cellSize"]
@@ -1055,15 +1109,17 @@ class Case(object):
         edge_lengths = []
         radii = []
         while j < iterations + 1:
-            print(f"cp system cellSetDict.1.backup system/cellSetDict.{j}")
-            shutil.copy2("system/cellSetDict.1.backup",f"system/cellSetDict.{j}")
-            cellSetCenter = self.bubble_center
+            print(f"cp system {cellSetDictBackup} system/cellSetDict.{j}")
+            shutil.copy2(f"system/{cellSetDictBackup}",f"system/cellSetDict.{j}")
+            #cellSetCenter = self.bubble_center
             self._sed(f"system/cellSetDict.{j}","dinit","{}".format(cellSetCenter))
             refDist = (refineUntil-refineFrom)/(1.-iterations)**2 * (j - iterations)**2 + refineFrom
             ec_curr = edge_length/2**j 
             radii.append(refDist)
             edge_lengths.append(ec_curr)
             print(f"refine radius: {refDist}, edge_length approx: {ec_curr}")
+            self._sed(f"system/cellSetDict.{j}","lowerrrradius","{}".format(-refDist+cellSetCenter))
+            self._sed(f"system/cellSetDict.{j}","upperrrradius","{}".format(refDist+cellSetCenter))
             self._sed(f"system/cellSetDict.{j}","rrradius","{}".format(refDist))
             j = j + 1
         
