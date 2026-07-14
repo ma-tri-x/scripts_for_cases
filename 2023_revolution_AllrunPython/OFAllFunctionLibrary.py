@@ -68,6 +68,24 @@ class Case(object):
         self.pBubble = self.pn * ((self.Rn**3. - self.beta*self.Rn**3.)/(self.R0**3. - self.beta*self.Rn**3.))**self.gamma + self.pV 
 
         self.relocate_funkySyntax_to_bubble_center(self.bubble_center)
+        
+        print("R0      = {} ".format(self.R0))
+        print("Rn      = {} ".format(self.Rn))
+        print("pn      = {} ".format(self.pn))
+        print("pBubble = {} ".format(self.pBubble))
+        
+        try:
+            self.D_initTwo, self.RnTwo, self.R0Two, self.RmaxTwo, self.t_aTwo, self.t_transitTwo = self.read_second_bubble_parms()
+            self.pnTwo = self.pInf + 2.* self.sigma / RnTwo - self.pV  
+            self.rho_nTwo = pnTwo / (self.specGasConst * self.Tref * (1.- self.beta) )
+            self.rho_minTwo = rho_nTwo * (RnTwo / RmaxTwo)**3. 
+            self.pBubbleTwo = pnTwo * ((RnTwo**3. - self.beta*RnTwo**3.)/(R0Two**3. - self.beta*RnTwo**3.))**self.gamma + self.pV
+            print("R0Two      = {} ".format(self.R0Two))
+            print("RnTwo      = {} ".format(self.RnTwo))
+            print("pnTwo      = {} ".format(self.pnTwo))
+            print("pBubbleTwo = {} ".format(self.pBubbleTwo))
+        except(KeyError):
+            pass
 
         self.funkySetFieldsLog = "log.funkySetFields"
         with open(self.funkySetFieldsLog,"w") as f:
@@ -75,11 +93,6 @@ class Case(object):
 
         self.startTime = self.conf_dict["controlDict"]["startTime"]
 
-        print("R0      = {} ".format(self.R0))
-        print("Rn      = {} ".format(self.Rn))
-        print("pn      = {} ".format(self.pn))
-        print("pBubble = {} ".format(self.pBubble))
-        
         self.copied_snappyHexMeshDict_already = False
         try:
             snappyScript = self.conf_dict["snappy"]["snappyScript"]
@@ -338,6 +351,15 @@ class Case(object):
         
         self.relocate_funkySyntax_to_bubble_center(self.bubble_center)
         
+    def set_alpha_field_PS_range(self,passiveScalar_range=[-10.0,10.0],D_init=self.bubble_center,R0=self.R0):
+        self.run_funkySetFields_command("alpha1","1.0","")
+        PSlow = passiveScalar_range[0]
+        PSup = passiveScalar_range[1]
+        
+        print(f"---- setting alpha1 field for a bubble with R0 = {R0} at D_init = {D_init} ----")
+        self.relocate_funkySyntax_to_bubble_center(D_init)
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{R0})*5.9/{self.widthOfInterface})+1)","passiveScalar > {PSlow} && passiveScalar < {PSup}")
+        
     def set_alpha_field_ellipse(self):
         print("----- setting alpha1 field ellipse ------")
         alpha = self.conf_dict["bubble"]["excentricity"]
@@ -444,6 +466,17 @@ class Case(object):
         true_alpha2_vol = float(true_alpha2_vol_str.split("\n")[0])
         return true_alpha2_vol
     
+    def get_alpha2_vol_t0_PS_range(self,passiveScalar_range,outfilename):
+        print("-- reading real discretized alpha2-volume in the range where")
+        print(f"passiveScalar is {passiveScalar_range} to {outfilename}")
+        stdout,stderr = self._run_system_command(f"get_alpha2_vol_t0_PS_range {passiveScalar_range[0]} {passiveScalar_range[1]} {outfilename}")
+        with open("log.get_alpha2_vol_t0_bubble1","w") as f:
+            f.write(stdout)
+            f.write(stderr)
+        true_alpha2_vol_str,_ = self._run_system_command(f"cat {outfilename}")
+        true_alpha2_vol = float(true_alpha2_vol_str.split("\n")[0])
+        return true_alpha2_vol
+    
     def read_theta(self):
         if not os.path.isfile("THETA"):
             print("ERROR: alter your meshDict.m4 such that it writes theta into THETA")
@@ -471,22 +504,8 @@ class Case(object):
             Rn_new = (p0/self.pInf)**(1./(3.*self.gamma))*Rdiscr
         return Rn_new    
     
-    def adapt_energy_LUT_doubleBubbles(self):
-        print("---- WARNING: adapt_energy_LUT_doubleBubbles not yet implemented!!!! ----")
-        print("---- WARNING: using raw input pressures!!!! ----")
-        self.run_funkySetFields_command(self.pVar,f"{self.pBubble}*(1.-alpha1)+{self.pVar}*alpha1","passiveScalar > 0.0")
-        
-        D_initTwo, RnTwo, R0Two, RmaxTwo, t_aTwo, t_transitTwo = self.read_second_bubble_parms()
-        
-        pnTwo = self.pInf + 2.* self.sigma / RnTwo - self.pV  
-        rho_nTwo = pnTwo / (self.specGasConst * self.Tref * (1.- self.beta) )
-        rho_minTwo = rho_nTwo * (RnTwo / RmaxTwo)**3. 
-        pBubbleTwo = pnTwo * ((RnTwo**3. - self.beta*RnTwo**3.)/(R0Two**3. - self.beta*RnTwo**3.))**self.gamma + self.pV
-        
-        self.run_funkySetFields_command(self.pVar,f"{pBubbleTwo}*(1.-alpha1)+{self.pVar}*alpha1","passiveScalar < 0.0")
-        print(f"---- pBubbleOne = {self.pBubble} ----")
-        print(f"---- pBubbleTwo = {pBubbleTwo} ----")
-    
+    """
+    ## deprecated:
     def adapt_energy(self):
         print("---- WARNING: function adapt_energy is deprepaced!!!! ----")
         print("---- use adapt_energy_LUT instead ----")
@@ -536,7 +555,89 @@ class Case(object):
         self.R0 = Rdiscr
         #
         self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
+    """
         
+    def _fitparms(self,Rdiscr):
+        x = Rdiscr
+        ### fitting parameter a:
+        # fit f(x) "fitparms_R0_Rn_Rmaxubd.dat" u (($1)*1e6):(($2)) via a,b,c,d,e
+        a               = -1.08866e-08    # +/- 3.61e-10     (3.316%)
+        b               = 3.65015e-06     # +/- 9.502e-08    (2.603%)
+        c               = -0.000363022    # +/- 7.179e-06    (1.978%)
+        d               = 1.58437         # +/- 0.01728      (1.091%)
+        e               = -35.1548        # +/- 0.4342       (1.235%)
+        fitparm_a = a*x**6 + b*x**5 +c*x**4 +d*x**2 + e*x
+        
+        ### fitting parameter b:
+        # fit f(x) "fitparms_R0_Rn_Rmaxubd.dat" u (($1)*1e6):(($3)) via a,b,c,d,e
+        a               = -5.04588e-08    # +/- 1.626e-09    (3.222%)
+        b               = 1.51759e-05     # +/- 4.252e-07    (2.802%)
+        c               = -0.00147806     # +/- 3.794e-05    (2.567%)
+        d               = 0.0356839       # +/- 0.001326     (3.717%)
+        e               = 2.89074         # +/- 0.01469      (0.5083%)
+        fitparm_b = a*x**4 +b*x**3 + c*x**2 + d*x +e
+        
+        ### fitting parameter c:
+        # fit f(x) "fitparms_R0_Rn_Rmaxubd.dat" u (($1)*1e6):(($4)) via a,b,c,d,g,h
+        a               = -1.28456e-15    # +/- 3.634e-17    (2.829%)
+        b               = 4.93381e-13     # +/- 1.158e-14    (2.348%)
+        c               = -6.824e-11      # +/- 1.291e-12    (1.892%)
+        d               = 3.6318e-09      # +/- 5.357e-11    (1.475%)
+        g               = -5.75011e-06    # +/- 4.616e-08    (0.8028%)
+        h               = 1.69221e-05     # +/- 6.679e-07    (3.947%)
+        fitparm_c = a*x**6 +b*x**5 + c*x**4 + d*x**3  + g*x +h
+        
+        return fitparm_a,fitparm_b,fitparm_c
+
+    #def adapt_energy_fitfuction_based_on_LUT(self):
+        #if not self.pInf == 101315.0:
+            #print("ERROR in adapt_energy_LUT: pInf != 101315.0")
+            #print("ERROR in adapt_energy_LUT: LUT not done for other pInfs")
+            #exit(1)
+            
+        #true_alpha2_vol = self.get_alpha2_vol_t0()
+        #Vinitdiscr = true_alpha2_vol
+        
+        #if self.conf_dict["mesh"]["meshDims"] == "2D":
+            #print("... adapt_energy: calculating 2D volume")
+            #theta = self.read_theta()
+            #Vinitdiscr = true_alpha2_vol * 180. / theta
+        #elif self.conf_dict["mesh"]["meshDims"] == "1D":
+            #print("... adapt_energy: calculating 1D volume")
+            #theta = self.read_theta()
+            #theta_rad = theta * np.pi /180.
+            #Vinitdiscr = true_alpha2_vol * np.pi / (np.tan(theta_rad))**2
+        
+        #Rdiscr = (Vinitdiscr / (4.*np.pi)*3)**(1./3.)
+        #print("... adapt_energy: R0_input = {}".format(self.R0))
+        #print("... adapt_energy: Rdiscr   = {}".format(Rdiscr))
+        
+        #Rmax_wanted = self.conf_dict["bubble"]["Rmax"]
+        
+        #print("... adapt_energy: Rmax_want= {}".format(Rmax_wanted))
+        
+        #a,b,c = self._fitparms(Rdiscr)
+        
+        #Rn_new = (-b + np.sqrt(b*b - 4*a*(c-Rmax_wanted)))/(2.*a)
+        #if Rn < 0.0 or np.isnan(Rn_new):
+            #Rn_new = (-b - np.sqrt(b*b - 4*a*(c-Rmax_wanted)))/(2.*a)
+        
+        #print("... adapt_energy: found Rn  ={}".format(Rn_new))
+        
+        #print("pBubble_old = {}".format(self.pBubble))
+        #self.R0 = Rdiscr
+        #self.Rn = Rn_new
+        #self.pn = self.pInf + 2.*self.sigma/self.Rn - self.pV
+        #self.pBubble = self.pn * ((self.Rn**3. - self.beta*self.Rn**3.)/(self.R0**3. - self.beta*self.Rn**3.))**self.gamma + self.pV 
+        #print("pBubble_new = {}".format(self.pBubble))
+        
+        #expression = f"{self.pBubble}*(1.-alpha1)+{self.pVar}*alpha1"
+        #self.run_funkySetFields_command(self.pVar,expression,"")
+        ##
+        #self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
+    
+    """
+    ## the following is deprecated:
     def adapt_energy_LUT(self):
         if not self.pInf == 101315.0:
             print("ERROR in adapt_energy_LUT: pInf != 101315.0")
@@ -657,17 +758,70 @@ class Case(object):
         self.run_funkySetFields_command(self.pVar,expression,"")
         #
         self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
+    """
+    
+    def get_correct_R0_Rn_pBubble_by_fitfunction_and_PS(self,passiveScalar_range=[-10.0,10.0],outfilename="0/get_alpha2_vol_t0",Rmax=self.conf_dict["bubble"]["Rmax"]):
+        if not self.pInf == 101315.0:
+            print("ERROR in adapt_energy_LUT: pInf != 101315.0")
+            print("ERROR in adapt_energy_LUT: LUT not done for other pInfs")
+            exit(1)
+            
+        true_alpha2_vol = self.get_alpha2_vol_t0_PS_range(passiveScalar_range,outfilename)
+        Vinitdiscr = true_alpha2_vol
         
-    def write_aimedRn_to_transportProperties(self,percent=64./184.1):
-        aimedRn = percent* self.Rn
-        self._sed("constant/transportProperties","_OFALLFUNC-AIMEDRN",f"{aimedRn}")
+        if self.conf_dict["mesh"]["meshDims"] == "2D":
+            print("... adapt_energy: calculating 2D volume")
+            theta = self.read_theta()
+            Vinitdiscr = true_alpha2_vol * 180. / theta
+        elif self.conf_dict["mesh"]["meshDims"] == "1D":
+            print("... adapt_energy: calculating 1D volume")
+            theta = self.read_theta()
+            theta_rad = theta * np.pi /180.
+            Vinitdiscr = true_alpha2_vol * np.pi / (np.tan(theta_rad))**2
         
-    def write_aimedRns_to_bubblesProperties(self,percent=64./184.1):
-        aimedRnOne = percent* self.Rn
-        self._sed("constant/BubblesProperties","_OFALLFUNC-AIMEDRN",f"{aimedRnOne}")
-        D_initTwo, RnTwo, R0Two, RmaxTwo, t_aTwo, t_transitTwo = self.read_second_bubble_parms()
-        aimedRnTwo = percent* RnTwo
-        self._sed("constant/BubblesProperties","_OFALLFUNC-SECONDBUBBLEAIMEDRN",f"{aimedRnTwo}")
+        Rdiscr = Vinitdiscr / (4.*np.pi)*3)**(1./3.)
+        
+        print("... adapt_energy (range [{},{}]): Rdiscr = {}".format(passiveScalar_range[0],passiveScalar_range[1],Rdiscr))
+        
+        Rmax_wanted = Rmax
+        
+        print("... adapt_energy (range [{},{}]): Rmax_want = {}".format(passiveScalar_range[0],passiveScalar_range[1],Rmax_wanted))
+        
+        a,b,c = self._fitparms(Rdiscr)
+        Rn_new = (-b + np.sqrt(b*b - 4*a*(c-Rmax_wanted)))/(2.*a)
+        if Rn_new < 0.0 or np.isnan(Rn_new):
+            Rn_new = (-b - np.sqrt(b*b - 4*a*(c-Rmax_wanted)))/(2.*a)
+        
+        print("... adapt_energy (range [{},{}]): found Rn = {}".format(passiveScalar_range[0],passiveScalar_range[1],Rn_new))
+        #expression = f"{self.pBubble}*(1.-alpha1)+{self.pVar}*alpha1"
+        #self.run_funkySetFields_command(self.pVar,expression,"")
+        ##
+        #self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
+        #self.run_funkySetFields_command(self.pVar,f"{self.pBubble}*(1.-alpha1)+{self.pVar}*alpha1","passiveScalar > 0.0")
+        pn = self.pInf + 2.*self.sigma/Rn_new - self.pV
+        pBubble = pn * ((Rn_new**3. - self.beta*Rn_new**3.)/(Rdiscr**3. - self.beta*Rn_new**3.))**self.gamma + self.pV
+        print("... adapt_energy (range [{},{}]): found pBubble = {}".format(passiveScalar_range[0],passiveScalar_range[1],pBubble))
+        
+        if Rdiscr < 10e-6 or Rdiscr > 120e-6 or Rn_new < 120e-6 or Rn_new > 340e-6 or Rmax_wanted < 120e-6 or Rmax_wanted > 0.000998455:
+            print(f"ERROR: R0,Rn,Rmax={Rdiscr},{Rn_new},{Rmax_wanted} out of bounds!")
+            print("stay within R0=[10,120]mum, Rn=[120,340]mum, Rmax=[120,998.455]mum")
+            exit(1)
+        
+        return Rdiscr,Rn_new,pBubble
+        
+    def write_Rn_and_aimedRn_to_OFdictionary(self,percent=64./184.1,Rn=self.Rn,dictionary="constant/BubblesProperties",
+                                             replaceable_string_Rn="_OFALLFUNC-_BUBBLERN",
+                                             replaceable_string_aimedRn="_OFALLFUNC-AIMEDRN"):
+        aimedRn = percent* Rn
+        self._sed(dictionary,replaceable_string_Rn,f"{Rn}")
+        self._sed(dictionary,replaceable_string_aimedRn,f"{aimedRn}")
+        
+    def set_bubble_pressure_PS_range(self,passiveScalar_range=[-10.0,10.0],pBubble=self.pBubble):
+        PSlow = passiveScalar_range[0]
+        PSup = passiveScalar_range[1]
+        
+        print(f"---- setting {pBubble} for the bubble in passiveScalar_range = {passiveScalar_range} ----")
+        self.run_funkySetFields_command(self.pVar,f"(1.0-alpha1)*{pBubble}+alpha1*{self.pVar}","passiveScalar > {PSlow} && passiveScalar < {PSup}")
             
     def replace_variable_in_OF_dict(self,OF_file,subdict,var_string,value):
         with open(OF_file,"r") as f:
