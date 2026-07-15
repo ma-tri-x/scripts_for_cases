@@ -76,10 +76,10 @@ class Case(object):
         
         try:
             self.D_initTwo, self.RnTwo, self.R0Two, self.RmaxTwo, self.t_aTwo, self.t_transitTwo = self.read_second_bubble_parms()
-            self.pnTwo = self.pInf + 2.* self.sigma / RnTwo - self.pV  
-            self.rho_nTwo = pnTwo / (self.specGasConst * self.Tref * (1.- self.beta) )
-            self.rho_minTwo = rho_nTwo * (RnTwo / RmaxTwo)**3. 
-            self.pBubbleTwo = pnTwo * ((RnTwo**3. - self.beta*RnTwo**3.)/(R0Two**3. - self.beta*RnTwo**3.))**self.gamma + self.pV
+            self.pnTwo = self.pInf + 2.* self.sigma / self.RnTwo - self.pV  
+            self.rho_nTwo = self.pnTwo / (self.specGasConst * self.Tref * (1.- self.beta) )
+            self.rho_minTwo = self.rho_nTwo * (self.RnTwo / self.RmaxTwo)**3. 
+            self.pBubbleTwo = self.pnTwo * ((self.RnTwo**3. - self.beta*self.RnTwo**3.)/(self.R0Two**3. - self.beta*self.RnTwo**3.))**self.gamma + self.pV
             print("R0Two      = {} ".format(self.R0Two))
             print("RnTwo      = {} ".format(self.RnTwo))
             print("pnTwo      = {} ".format(self.pnTwo))
@@ -328,6 +328,25 @@ class Case(object):
             with open(self.funkySetFieldsLog,"a") as f:
                 f.write(stdout)
                 f.write(stderr)
+                
+    def run_funkySetFields_command_PARALLEL_LATESTTIME(self,field,expression,condition,threads=30):
+        cmd = ["mpirun","-np",str(threads),"funkySetFields","-case", ".","-field", f"{field}","-expression", expression,"-condition",condition,"-latestTime","-keepPatches","-parallel"]
+        if condition == "":
+            cmd = ["mpirun","-np",str(threads),"funkySetFields","-case", ".","-field", f"{field}","-expression", expression,"-latestTime","-keepPatches","-parallel"]
+        a = subprocess.run(cmd,capture_output=True, universal_newlines=True)
+        #stdout = str(a.stdout.decode('utf-8')).replace("\\n","\n")
+        #stderr = str(a.stderr.decode('utf-8')).replace("\\n","\n")
+        stdout = a.stdout
+        stderr = a.stderr
+        if not a.returncode == 0:
+            print("Error in subprocess {}".format(cmd))
+            print(a.stdout)
+            print(a.stderr)
+            exit(a.returncode)
+        else:
+            with open(self.funkySetFieldsLog,"a") as f:
+                f.write(stdout)
+                f.write(stderr)
         
     def set_U_field_zero(self):
         print("---- setting field U to zero ----")
@@ -351,14 +370,22 @@ class Case(object):
         
         self.relocate_funkySyntax_to_bubble_center(self.bubble_center)
         
-    def set_alpha_field_PS_range(self,passiveScalar_range=[-10.0,10.0],D_init=self.bubble_center,R0=self.R0):
+    def set_alpha_field_bubble_PS_range(self,D_init,R0,passiveScalar_range=[-10.0,10.0]):
         self.run_funkySetFields_command("alpha1","1.0","")
         PSlow = passiveScalar_range[0]
         PSup = passiveScalar_range[1]
         
         print(f"---- setting alpha1 field for a bubble with R0 = {R0} at D_init = {D_init} ----")
         self.relocate_funkySyntax_to_bubble_center(D_init)
-        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{R0})*5.9/{self.widthOfInterface})+1)","passiveScalar > {PSlow} && passiveScalar < {PSup}")
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{R0})*5.9/{self.widthOfInterface})+1)",f"passiveScalar > {PSlow} && passiveScalar < {PSup}")
+        
+    def set_alpha_field_secondBubble_PS_range_PARALLEL_LATESTTIME(self,D_init,R0,passiveScalar_range=[-10.0,10.0]):
+        PSlow = passiveScalar_range[0]
+        PSup = passiveScalar_range[1]
+        
+        print(f"---- setting alpha1 field for a bubble with R0 = {R0} at D_init = {D_init} ----")
+        self.relocate_funkySyntax_to_bubble_center(D_init)
+        self.run_funkySetFields_command_PARALLEL_LATESTTIME("alpha1",f"0.5*(tanh(({self.radial_distance}-{R0})*5.9/{self.widthOfInterface})+1)",f"passiveScalar > {PSlow} && passiveScalar < {PSup}")
         
     def set_alpha_field_ellipse(self):
         print("----- setting alpha1 field ellipse ------")
@@ -468,14 +495,51 @@ class Case(object):
     
     def get_alpha2_vol_t0_PS_range(self,passiveScalar_range,outfilename):
         print("-- reading real discretized alpha2-volume in the range where")
-        print(f"passiveScalar is {passiveScalar_range} to {outfilename}")
-        stdout,stderr = self._run_system_command(f"get_alpha2_vol_t0_PS_range {passiveScalar_range[0]} {passiveScalar_range[1]} {outfilename}")
+        print(f"-- passiveScalar is {passiveScalar_range} to {outfilename}")
+        
+        #now bit of a workaround because utility cannot handle "/" in argument -outfilename:
+        split_dirs = []
+        datafile = outfilename
+        if "/" in outfilename:
+            split_dirs = outfilename.split("/")
+            datafile = split_dirs[-1]
+            if len(split_dirs) > 2:
+                print(f"ERROR: only max. one subdir for {datafile}!")
+                exit(1)
+        stdout,stderr = self._run_system_command(f"get_alpha2_vol_t0_PS_range -lower_PS_value {passiveScalar_range[0]} -upper_PS_value {passiveScalar_range[1]} -outfilename {datafile}")
         with open("log.get_alpha2_vol_t0_bubble1","w") as f:
             f.write(stdout)
             f.write(stderr)
+        if "/" in outfilename:
+            stdout,stderr = self._run_system_command(f"mv {datafile} {outfilename}")
+        
         true_alpha2_vol_str,_ = self._run_system_command(f"cat {outfilename}")
         true_alpha2_vol = float(true_alpha2_vol_str.split("\n")[0])
         return true_alpha2_vol
+    
+    def get_alpha2_vol_t0_PS_range_PARALLEL_LATESTTIME(self,passiveScalar_range,outfilename,threads=30):
+        print("-- reading real discretized alpha2-volume in the range where")
+        print(f"-- passiveScalar is {passiveScalar_range} to {outfilename}")
+        print("-- WARNING: disregarding subdirectories, files will be written to processor*")
+        
+        #now bit of a workaround because utility cannot handle "/" in argument -outfilename:
+        split_dirs = []
+        datafile = outfilename
+        if "/" in outfilename:
+            split_dirs = outfilename.split("/")
+            datafile = split_dirs[-1]
+            
+        stdout,stderr = self._run_system_command(f"mpirun -np {threads} get_alpha2_vol_t0_PS_range -lower_PS_value {passiveScalar_range[0]} -upper_PS_value {passiveScalar_range[1]} -outfilename {datafile} -parallel -latestTime")
+        with open("log.get_alpha2_vol_t0_bubble_parallel_latestTime","w") as f:
+            f.write(stdout)
+            f.write(stderr)
+        vol_sum = 0.0
+        for proc_dir in glob.glob("processor*"):
+            with open(os.path.join(proc_dir,datafile),"r") as f:
+                vol = f.read()
+                vol_sum = vol_sum + float(vol)
+        
+        return vol_sum
     
     def read_theta(self):
         if not os.path.isfile("THETA"):
@@ -558,7 +622,7 @@ class Case(object):
     """
         
     def _fitparms(self,Rdiscr):
-        x = Rdiscr
+        x = Rdiscr*1e6 ## the function was fit with R0 in micrometer
         ### fitting parameter a:
         # fit f(x) "fitparms_R0_Rn_Rmaxubd.dat" u (($1)*1e6):(($2)) via a,b,c,d,e
         a               = -1.08866e-08    # +/- 3.61e-10     (3.316%)
@@ -760,13 +824,17 @@ class Case(object):
         self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
     """
     
-    def get_correct_R0_Rn_pBubble_by_fitfunction_and_PS(self,passiveScalar_range=[-10.0,10.0],outfilename="0/get_alpha2_vol_t0",Rmax=self.conf_dict["bubble"]["Rmax"]):
+    def get_correct_R0_Rn_pBubble_by_fitfunction_and_PS(self,Rmax,passiveScalar_range=[-10.0,10.0],outfilename="0/get_alpha2_vol_t0",parallel_latestTime=False,threads=30):
         if not self.pInf == 101315.0:
             print("ERROR in adapt_energy_LUT: pInf != 101315.0")
             print("ERROR in adapt_energy_LUT: LUT not done for other pInfs")
             exit(1)
             
-        true_alpha2_vol = self.get_alpha2_vol_t0_PS_range(passiveScalar_range,outfilename)
+        true_alpha2_vol = 0.0
+        if not parallel_latestTime:
+            true_alpha2_vol = self.get_alpha2_vol_t0_PS_range(passiveScalar_range,outfilename)
+        else:
+            true_alpha2_vol = self.get_alpha2_vol_t0_PS_range_PARALLEL_LATESTTIME(passiveScalar_range,outfilename,threads)
         Vinitdiscr = true_alpha2_vol
         
         if self.conf_dict["mesh"]["meshDims"] == "2D":
@@ -779,7 +847,7 @@ class Case(object):
             theta_rad = theta * np.pi /180.
             Vinitdiscr = true_alpha2_vol * np.pi / (np.tan(theta_rad))**2
         
-        Rdiscr = Vinitdiscr / (4.*np.pi)*3)**(1./3.)
+        Rdiscr = (Vinitdiscr / (4.*np.pi)*3)**(1./3.)
         
         print("... adapt_energy (range [{},{}]): Rdiscr = {}".format(passiveScalar_range[0],passiveScalar_range[1],Rdiscr))
         
@@ -808,20 +876,40 @@ class Case(object):
             exit(1)
         
         return Rdiscr,Rn_new,pBubble
+    
+    def get_correct_R0_Rn_pBubble_by_fitfunction_and_PS_PARALLEL_LATESTTIME(self,Rmax,passiveScalar_range=[-10.0,10.0],outfilename="get_alpha2_vol_t0_bubble2"):
+        Rdiscr,Rn_new,pBubble = self.get_correct_R0_Rn_pBubble_by_fitfunction_and_PS(Rmax,passiveScalar_range,outfilename,True)
         
-    def write_Rn_and_aimedRn_to_OFdictionary(self,percent=64./184.1,Rn=self.Rn,dictionary="constant/BubblesProperties",
+        return Rdiscr,Rn_new,pBubble
+        
+    def write_Rn_and_aimedRn_to_OFdictionary(self,Rn,percent=64./184.1,dictionary="constant/BubblesProperties",
                                              replaceable_string_Rn="_OFALLFUNC-_BUBBLERN",
                                              replaceable_string_aimedRn="_OFALLFUNC-AIMEDRN"):
         aimedRn = percent* Rn
         self._sed(dictionary,replaceable_string_Rn,f"{Rn}")
         self._sed(dictionary,replaceable_string_aimedRn,f"{aimedRn}")
         
-    def set_bubble_pressure_PS_range(self,passiveScalar_range=[-10.0,10.0],pBubble=self.pBubble):
+    def write_Rns_and_aimedRns_to_BubblesProperties(self,Rn1,Rn2):
+        self.write_Rn_and_aimedRn_to_OFdictionary(Rn=Rn1,dictionary="constant/BubblesProperties",
+                                                  replaceable_string_Rn="_OFALLFUNC-RN",
+                                                  replaceable_string_aimedRn="_OFALLFUNC-AIMEDRN")
+        self.write_Rn_and_aimedRn_to_OFdictionary(Rn=Rn2,dictionary="constant/BubblesProperties",
+                                                  replaceable_string_Rn="_OFALLFUNC-SECONDBUBBLERN",
+                                                  replaceable_string_aimedRn="_OFALLFUNC-SECONDBUBBLEAIMEDRN")
+        
+    def set_bubble_pressure_PS_range(self,pBubble,passiveScalar_range=[-10.0,10.0]):
         PSlow = passiveScalar_range[0]
         PSup = passiveScalar_range[1]
         
         print(f"---- setting {pBubble} for the bubble in passiveScalar_range = {passiveScalar_range} ----")
-        self.run_funkySetFields_command(self.pVar,f"(1.0-alpha1)*{pBubble}+alpha1*{self.pVar}","passiveScalar > {PSlow} && passiveScalar < {PSup}")
+        self.run_funkySetFields_command(self.pVar,f"(1.0-alpha1)*{pBubble}+alpha1*{self.pVar}",f"passiveScalar > {PSlow} && passiveScalar < {PSup}")
+        
+    def set_bubble_pressure_PS_range_PARALLEL_LATESTTIME(self,pBubble,passiveScalar_range=[-10.0,10.0]):
+        PSlow = passiveScalar_range[0]
+        PSup = passiveScalar_range[1]
+        
+        print(f"---- setting {pBubble} for the bubble in passiveScalar_range = {passiveScalar_range} ----")
+        self.run_funkySetFields_command_PARALLEL_LATESTTIME(self.pVar,f"(1.0-alpha1)*{pBubble}+alpha1*{self.pVar}",f"passiveScalar > {PSlow} && passiveScalar < {PSup}")
             
     def replace_variable_in_OF_dict(self,OF_file,subdict,var_string,value):
         with open(OF_file,"r") as f:
@@ -840,6 +928,19 @@ class Case(object):
         with open(OF_file,"w") as fd:
             fd.writelines(lines)
                 
+    def replace_direct_variable_in_OF_system_dict(self,OF_file,var_string,value):
+        with open(OF_file,"r") as f:
+            lines = f.readlines()
+        for i,line in enumerate(lines):
+            #if f"{var_string}" in line and not line[0:2] == "//":
+            if line.startswith(f"{var_string}"):
+                updated_line = f"{var_string}    {value};\n"
+                lines[i] = updated_line
+        with open(OF_file,"w") as fd:
+            fd.writelines(lines)
+            
+    def replace_end_time_in_controlDict(self,end_time):
+        self.replace_direct_variable_in_OF_system_dict("system/controlDict","endTime",end_time)
         
     def adapt_pV(self):
         print("---- setting pressure with same adiabatic constant for discretization ----")
@@ -1350,6 +1451,26 @@ class Case(object):
         time_steps = np.array([float(i.split('/')[-1]) for i in time_files])
         return(np.max(time_steps))
     
+    def find_biggestNumber_as_string(self):
+        dpath = "processor0"
+        time_files = [i for i in os.listdir(dpath) if path_is_num(i)]  
+        time_steps = np.array([float(i) for i in time_files])
+        #biggest_number = np.max(time_steps)
+        index = np.argmax(time_steps)
+        return time_files[index]
+    
+    def modify_latest_deltaT(self):
+        print("modifying the stored deltaT...")
+        latestTime = find_biggestNumber_as_string()
+        proc_list = glob.glob("processor*")
+        for proc_dir in proc_list:
+            stored_time_file = f"{proc_dir}/{latestTime}/uniform/time"
+            if not os.path.isfile(f"{stored_time_file}_backup.gz"):
+                shutil.copy2(f"{stored_time_file}.gz",f"{stored_time_file}_backup.gz")
+            os.system(f"gunzip {stored_time_file}.gz")
+            case.replace_direct_variable_in_OF_system_dict(stored_time_file,"deltaT",1e-11)
+            case.replace_direct_variable_in_OF_system_dict(stored_time_file,"deltaT0",1e-11)
+            os.system(f"gzip {stored_time_file}")
     
     
     
