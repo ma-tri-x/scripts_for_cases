@@ -1364,7 +1364,7 @@ class Case(object):
         edge_lengths = []
         radii = []
         while j < iterations + 1:
-            print(f"cp system {cellSetDictBackup} system/cellSetDict.{j}")
+            print(f"cp system/{cellSetDictBackup} system/cellSetDict.{j}")
             shutil.copy2(f"system/{cellSetDictBackup}",f"system/cellSetDict.{j}")
             #cellSetCenter = self.bubble_center
             self._sed(f"system/cellSetDict.{j}","dinit","{}".format(cellSetCenter))
@@ -1395,6 +1395,35 @@ class Case(object):
         while j < iterations + 1:
             print(f"cellSetting {j}...")
             shutil.copy2(f"system/cellSetDict.{j}","system/cellSetDict")
+            stdout,stderr = self._run_system_command("cellSet")
+            with open(f"log.cellSet.{j}","w") as f:
+                f.write(stdout)
+                f.write(stderr)
+            print("refining mesh...")
+            stdout,stderr = self._run_system_command("refineMesh -dict")
+            with open(f"log.refineMesh.{j}","w") as f:
+                f.write(stdout)
+                f.write(stderr)
+            latestRefineFolder = self.find_biggestNumber(proc_path=".")
+            content = glob.glob(f"{latestRefineFolder}/polyMesh/*")
+            for i in content:
+                stdout,stderr = self._run_system_command(f"cp -r {i} constant/polyMesh/")
+            print(f"rm -rf {latestRefineFolder}")
+            self._run_system_command(f"rm -rf {latestRefineFolder}")
+            j = j + 1
+            
+    def refineMesh2D_useExisting_set_of_cellSetDict(self,existing_cellSetDict_batch_dir):
+        print(f"preparation done using existing cellSetDict of folder {existing_cellSetDict_batch_dir}...")
+        iterations = len(glob.glob(f"{existing_cellSetDict_batch_dir}/cellSetDict.*"))
+        print(f"number of iterations: {iterations}")
+        shutil.copy2("system/refineMeshDict.2D","system/refineMeshDict")
+        j=1
+        print("refining ...")
+        while j < iterations + 1:
+            print(f"cp {existing_cellSetDict_batch_dir}/cellSetDict.{j} system/cellSetDict")
+            shutil.copy2(f"{existing_cellSetDict_batch_dir}/cellSetDict.{j}","system/cellSetDict")
+            
+            print(f"cellSetting {j}...")
             stdout,stderr = self._run_system_command("cellSet")
             with open(f"log.cellSet.{j}","w") as f:
                 f.write(stdout)
