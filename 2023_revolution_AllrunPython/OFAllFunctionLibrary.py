@@ -1501,6 +1501,14 @@ class Case(object):
             case.replace_direct_variable_in_OF_system_dict(stored_time_file,"deltaT0",1e-11)
             os.system(f"gzip {stored_time_file}")
     
+    def prepare_snappyHexMesh_using_preexisting_dict(self,snappyHexMeshDict_file):
+        print("--- using existing!! snappyHexMeshDict for CAD object and bubble region refinement...")
+        script = snappyHexMeshDict_file
+        print(f".. using {script} as basis ..")
+        shutil.copy2(script,"system/snappyHexMeshDict")
+        self.copied_snappyHexMeshDict_already = True
+        
+    
     
     
     
