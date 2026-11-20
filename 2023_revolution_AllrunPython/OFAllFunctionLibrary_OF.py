@@ -40,8 +40,8 @@ class Case(object):
         self.copy_0backup()
         self.bubble_center = self.determine_bubble_center()
         
-        self.gamma = self.conf_dict["gas"]["gamma"]
-        self.pV = self.conf_dict["gas"]["pV"]
+        self.gamma = self.conf_dict["air"]["gamma"]
+        self.pV = self.conf_dict["air"]["pV"]
         if self.pV > np.abs(1e-12):
             print("ERROR: p_V not yet implemented in Temperature")
             exit(1)
@@ -57,8 +57,8 @@ class Case(object):
         self.mu_l = self.conf_dict["liquid"]["mu"]
         self.Tref = self.conf_dict["transportProperties"]["Tref"]
         self.gasConstGeneral = self.conf_dict["transportProperties"]["gasConstGeneral"] # J/mol K
-        self.specGasConst = self.conf_dict["gas"]["specGasConst"]
-        self.beta = 0.0 #self.conf_dict["gas"]["beta"]
+        self.specGasConst = self.conf_dict["air"]["specGasConst"]
+        self.beta = 0.0 #self.conf_dict["air"]["beta"]
 
         self.pn = self.pInf + 2.* self.sigma / self.Rn - self.pV  
         self.Rmax = self.conf_dict["bubble"]["Rmax"]
@@ -487,7 +487,7 @@ class Case(object):
         self.pn = pndiscr
         self.R0 = Rdiscr
         #
-        self.replace_variable_in_OF_dict("constant/transportProperties","gas","Rn",self.Rn)
+        self.replace_variable_in_OF_dict("constant/transportProperties","air","Rn",self.Rn)
         
     def replace_variable_in_OF_dict(self,OF_file,subdict,var_string,value):
         with open(OF_file,"r") as f:
