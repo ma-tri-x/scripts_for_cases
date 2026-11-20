@@ -370,8 +370,12 @@ class Case(object):
         
         self.relocate_funkySyntax_to_bubble_center(self.bubble_center)
         
-    def set_alpha_field_bubble_PS_range(self,D_init,R0,passiveScalar_range=[-10.0,10.0]):
+    def reset_alpha_field(self):
         self.run_funkySetFields_command("alpha1","1.0","")
+        
+    def set_alpha_field_bubble_PS_range(self,D_init,R0,passiveScalar_range=[-10.0,10.0],reset=True):
+        if reset:
+            self.run_funkySetFields_command("alpha1","1.0","")
         PSlow = passiveScalar_range[0]
         PSup = passiveScalar_range[1]
         
@@ -1140,9 +1144,8 @@ class Case(object):
         print(f".. using {script} as basis ..")
         shutil.copy2(script,"system/snappyHexMeshDict")
         self.copied_snappyHexMeshDict_already = True
-        refinementCenter = kwargs.get('refinementCenter',None)
-        if not refinementCenter:
-            refinementCenter = self.bubble_center
+        refinementCenter = kwargs.get('refinementCenter',self.bubble_center)
+        print("refinementCenter = {}".format(refinementCenter))
         
         ### --- objects part
         objects_str = ""
