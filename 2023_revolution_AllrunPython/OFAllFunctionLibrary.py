@@ -112,7 +112,19 @@ class Case(object):
         self.distance_vector = f"vector({self.z_coord}, {self.y_coord}, {self.z_coord})"
         self.radial_distance = f"sqrt({self.sq_x} + {self.sq_y} + {self.sq_z})"
         self.unit_vector = f"{self.distance_vector} / {self.radial_distance}"
-        
+    
+    def relocate_funkySyntax_to_bubble_center_xyz(self,bubble_origin=(0.0,0.0,0.0)):
+        self.x_coord = "pos().x"
+        self.y_coord = "pos().y"
+        self.z_coord = "pos().z"
+        self.sq_x = f"(({self.x_coord}-{bubble_origin[0]})*({self.x_coord}-{bubble_origin[0]}))"
+        self.sq_y = f"(({self.y_coord}-{bubble_origin[1]})*({self.y_coord}-{bubble_origin[1]}))"
+        self.sq_z = f"(({self.z_coord}-{bubble_origin[2]})*({self.z_coord}-{bubble_origin[2]}))"
+
+        self.distance_vector = f"vector({self.z_coord}, {self.y_coord}, {self.z_coord})"
+        self.radial_distance = f"sqrt({self.sq_x} + {self.sq_y} + {self.sq_z})"
+        self.unit_vector = f"{self.distance_vector} / {self.radial_distance}"
+    
     def read_second_bubble_parms(self):
         subdict = self.conf_dict["secondBubble"]
         return subdict["D_init"],subdict["Rn"],subdict["Rstart"],subdict["Rmax"],subdict["tTransitStart"],subdict["dtTransit"]
@@ -382,7 +394,18 @@ class Case(object):
         print(f"---- setting alpha1 field for a bubble with R0 = {R0} at D_init = {D_init} ----")
         self.relocate_funkySyntax_to_bubble_center(D_init)
         self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{R0})*5.9/{self.widthOfInterface})+1)",f"passiveScalar > {PSlow} && passiveScalar < {PSup}")
+    
+    def set_alpha_field_bubble_PS_range_relocate_bubble_origin(self,D_init,R0,passiveScalar_range=[-10.0,10.0],reset=True,bubble_origin=(0.0,0.0,0.0)):
+        if reset:
+            self.run_funkySetFields_command("alpha1","1.0","")
+        PSlow = passiveScalar_range[0]
+        PSup = passiveScalar_range[1]
         
+        print(f"---- setting alpha1 field for a bubble with R0 = {R0} at {bubble_origin} ----")
+        self.relocate_funkySyntax_to_bubble_center_xyz(bubble_origin)
+        self.run_funkySetFields_command("alpha1",f"0.5*(tanh(({self.radial_distance}-{R0})*5.9/{self.widthOfInterface})+1)",f"passiveScalar > {PSlow} && passiveScalar < {PSup}")
+    
+    
     def set_alpha_field_secondBubble_PS_range_PARALLEL_LATESTTIME(self,D_init,R0,passiveScalar_range=[-10.0,10.0]):
         PSlow = passiveScalar_range[0]
         PSup = passiveScalar_range[1]
@@ -1416,10 +1439,19 @@ class Case(object):
             j = j + 1
             
     def refineMesh2D_useExisting_set_of_cellSetDict(self,existing_cellSetDict_batch_dir):
+        refineMesh_useExisting_set_of_cellSetDict(self,existing_cellSetDict_batch_dir,dims="2D")
+    
+    def refineMesh_useExisting_set_of_cellSetDict(self,existing_cellSetDict_batch_dir,dims):
         print(f"preparation done using existing cellSetDict of folder {existing_cellSetDict_batch_dir}...")
         iterations = len(glob.glob(f"{existing_cellSetDict_batch_dir}/cellSetDict.*"))
         print(f"number of iterations: {iterations}")
-        shutil.copy2("system/refineMeshDict.2D","system/refineMeshDict")
+        if dims == "2D":
+            shutil.copy2("system/refineMeshDict.2D","system/refineMeshDict")
+        elif dims == "3D":
+            shutil.copy2("system/refineMeshDict.3D","system/refineMeshDict")
+        else:
+            print("ERROR: provide dimension 2D or 3D to refineMesh_useExisting_set_of_cellSetDict")
+            exit(1)
         j=1
         print("refining ...")
         while j < iterations + 1:
